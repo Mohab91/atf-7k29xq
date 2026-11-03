@@ -79,6 +79,12 @@ textarea{min-height:90px;resize:vertical}
 .chips{display:flex;gap:6px;overflow:auto;margin-bottom:10px}.chips button{border:1px solid var(--g9);background:#fff;color:var(--g9);border-radius:99px;padding:6px 14px;white-space:nowrap;cursor:pointer;font-size:14px}.chips button.on{background:var(--g9);color:var(--gold)}
 #printroot{display:none}
 @media print{body.printing{display:block;overflow:visible;height:auto;background:#fff;color:#000}body.printing>*:not(#printroot){display:none!important}body.printing #printroot{display:block;direction:rtl;font-family:Cairo,Tahoma,Arial,sans-serif;padding:20px}#printroot table{width:100%;border-collapse:collapse}#printroot th{background:#0B2B1F!important;color:#C99A3B!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}#printroot th,#printroot td{border:1px solid #C99A3B;padding:8px;text-align:right}#printroot .ph{display:flex;align-items:center;gap:12px;border-bottom:3px solid #C99A3B;padding-bottom:8px;margin-bottom:12px}#printroot .ph img{width:70px}#printroot h2{color:#7A0D1E;margin:0}}
+.chip.urg{background:var(--bu);color:var(--cream);border-color:var(--bu);font-weight:700}
+.chip.imp{background:var(--gold);color:var(--g9);border-color:var(--gold);font-weight:700}
+.item{border-top:1px solid var(--line);padding:10px 0;cursor:pointer}.item:first-of-type{border-top:0;padding-top:0}.item b{color:var(--g9)}
+nav button{position:relative}
+.badge{position:absolute;top:2px;inset-inline-start:calc(50% + 6px);min-width:18px;height:18px;border-radius:9px;background:var(--bu);color:var(--cream);font-size:11px;line-height:18px;text-align:center;padding:0 4px;font-weight:700}
+.nav6 button{font-size:11.5px}
 </style>
 </head>
 <body>
@@ -138,6 +144,8 @@ textarea{min-height:90px;resize:vertical}
     list: icon('<path d="M9 6h12M9 12h12M9 18h12"/><path d="M3.5 6l1 1 2-2M3.5 12l1 1 2-2M3.5 18l1 1 2-2"/>'),
     mem: icon('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 3-6 6.5-6s6.5 2.4 6.5 6M16 4.5a3.5 3.5 0 010 7M18 14.5c2 .7 3.5 2.5 3.5 5.5"/>'),
     send: icon('<path d="M21 3L10 14M21 3l-7 18-4-7-7-4z"/>'),
+    week: icon('<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 13h2M12 13h2M16 13h2M8 17h2M12 17h2"/>'),
+    alerts: icon('<path d="M6 8a6 6 0 0112 0c0 7 3 8 3 8H3s3-1 3-8M10 20a2 2 0 004 0"/>'),
     more: icon('<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>')
   };
 
@@ -160,13 +168,16 @@ textarea{min-height:90px;resize:vertical}
   }
   function openStored(key) { idbGet(key).then(function (f) { if (!f) return toast('الملف غير موجود على هذا الجهاز'); var b = new Blob([f.buf], { type: f.type }); if (!window.open(URL.createObjectURL(b), '_blank')) saveBlob(b, f.name); }); }
   function shareStored(key) { idbGet(key).then(function (f) { if (!f) return toast('الملف غير موجود على هذا الجهاز'); shareFile(new File([f.buf], f.name, { type: f.type })); }); }
-  function ics(ev) {
+  function ics(ev, days) {
     function d8(s) { return s.replace(/-/g, ''); }
     var L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Technical Secretariat//AR', 'BEGIN:VEVENT', 'UID:' + ev.id + '@atf', 'DTSTAMP:' + new Date().toISOString().replace(/[-:]|\.\d+/g, '')];
     if (ev.time) { var p = ev.time.split(':'), e = parse(ev.date); e.setHours(+p[0] + 1, +p[1]); L.push('DTSTART:' + d8(ev.date) + 'T' + ev.time.replace(':', '') + '00', 'DTEND:' + d8(iso(e)) + 'T' + ('0' + e.getHours()).slice(-2) + ('0' + e.getMinutes()).slice(-2) + '00'); }
     else { var n = parse(ev.date); n.setDate(n.getDate() + 1); L.push('DTSTART;VALUE=DATE:' + d8(ev.date), 'DTEND;VALUE=DATE:' + d8(iso(n))); }
-    L.push('SUMMARY:' + (ev.type === 'meeting' ? 'اجتماع: ' : 'مهمة: ') + ev.title.replace(/[\n,;]/g, ' '), 'DESCRIPTION:' + (ev.details || '').replace(/\n/g, '\\n').replace(/[,;]/g, ' '));
+    L.push('SUMMARY:' + (ev.type === 'meeting' ? 'اجتماع: ' : 'تكليف: ') + ev.title.replace(/[\n,;]/g, ' '), 'DESCRIPTION:' + (ev.details || '').replace(/\n/g, '\\n').replace(/[,;]/g, ' '));
     if (ev.place) L.push('LOCATION:' + ev.place.replace(/[,;]/g, ' '));
+    var tt = (ev.type === 'meeting' ? 'اجتماع: ' : 'تكليف: ') + ev.title.replace(/[\n,;]/g, ' ');
+    L.push('BEGIN:VALARM', 'TRIGGER:-P' + (days || 2) + 'D', 'ACTION:DISPLAY', 'DESCRIPTION:تذكير ' + tt, 'END:VALARM');
+    if (ev.time) L.push('BEGIN:VALARM', 'TRIGGER:-PT1H', 'ACTION:DISPLAY', 'DESCRIPTION:بعد ساعة ' + tt, 'END:VALARM');
     L.push('END:VEVENT', 'END:VCALENDAR');
     saveBlob(new Blob([L.join('\r\n')], { type: 'text/calendar' }), 'event.ics');
   }
@@ -199,28 +210,46 @@ textarea{min-height:90px;resize:vertical}
   function switchRole() { if (confirm('تغيير الدور؟ بياناتك تبقى محفوظة ولا تُحذف.')) { localStorage.removeItem(RKEY); chooseRole(); } }
 
   // ================================================================ HEAD
-  var S, ui = { tab: 'cal', y: 0, m: 0, sel: '', filter: 'open' };
+  var S, ui = { tab: 'cal', y: 0, m: 0, sel: '', filter: 'open', wk: '', wmode: 'status', wscope: 'week' };
   function save() { lsSet(KEY, S); }
   function headLoad() {
     S = lsGet(KEY);
     if (!S || !S.members) { S = { members: SEED || [], events: [], settings: {} }; if (SEED) save(); }
-    S.settings = S.settings || {}; if (!S.settings.notice) S.settings.notice = DEF_NOTICE;
-    var td = new Date(); ui.y = td.getFullYear(); ui.m = td.getMonth(); ui.sel = iso(td);
+    S.settings = S.settings || {}; if (!S.settings.notice) S.settings.notice = DEF_NOTICE; S.groups = S.groups || [];
+    var td = new Date(); ui.y = td.getFullYear(); ui.m = td.getMonth(); ui.sel = iso(td); ui.wk = weekStart(iso(td));
   }
   function mem(id) { return S.members.filter(function (m) { return m.id === id; })[0]; }
   function stOf(ev, id) { ev.status = ev.status || {}; var s = ev.status[id]; if (!s) s = ev.status[id] = { k: uid() + uid(), s: 'open' }; if (!s.k) s.k = uid() + uid(); if (!s.s) s.s = 'open'; return s; }
   function isDone(ev) { return ev.assignees.length > 0 && ev.assignees.every(function (id) { return stOf(ev, id).s === 'done'; }); }
   function doneCount(ev) { return ev.assignees.filter(function (id) { return stOf(ev, id).s === 'done'; }).length; }
-  function dayEvents(d) { return S.events.filter(function (e) { return e.date === d; }).sort(function (a, b) { return (a.time || '99').localeCompare(b.time || '99'); }); }
+  function dayEvents(d) {
+    return S.events.filter(function (e) { return e.date === d || e.assignees.some(function (id) { var st = stOf(e, id); return st.s === 'postponed' && st.nd === d; }); })
+      .sort(function (a, b) { return (b.urg ? 1 : 0) - (a.urg ? 1 : 0) || (a.time || '99').localeCompare(b.time || '99'); });
+  }
   function chip(t, c) { return h('span', { class: 'chip ' + (c || ''), text: t }); }
   function stChip(s) { return chip(ST[s], s === 'done' ? 'ok' : s === 'completion' ? 'bad' : s === 'postponed' ? 'w' : ''); }
+  function alertDays() { return Math.max(1, Math.min(14, +(S && S.settings && S.settings.alertDays) || 2)); }
+  function dueOf(ev, mid) { var st = stOf(ev, mid); return st.s === 'postponed' && st.nd ? st.nd : ev.date; }
+  function dayDiff(a, b) { return Math.round((parse(a) - parse(b)) / 864e5); }
+  function flagChips(imp, urg) { return [urg ? chip('عاجل', 'urg') : null, imp ? chip('هام', 'imp') : null]; }
+  function dshort(s) { return parse(s).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' }); }
+  function weekStart(d) { var x = parse(d); x.setDate(x.getDate() - (x.getDay() + 1) % 7); return iso(x); }
+  function addDays(s, n) { var x = parse(s); x.setDate(x.getDate() + n); return iso(x); }
+  function pairs() { var out = []; S.events.forEach(function (ev) { ev.assignees.forEach(function (mid) { var m = mem(mid); if (m) out.push({ ev: ev, m: m, st: stOf(ev, mid), due: dueOf(ev, mid) }); }); }); return out; }
+  function alertItems() {
+    var t = iso(new Date()), n = alertDays();
+    return pairs().filter(function (p) { if (p.st.s === 'done' || !p.due) return false; var d = dayDiff(p.due, t); return d <= n && !(p.ev.type === 'meeting' && d < 0); });
+  }
+  function alertCount() { var seen = {}; alertItems().forEach(function (p) { seen[p.ev.id] = 1; }); return Object.keys(seen).length; }
 
   function render() {
-    var tabs = [['cal', 'التقويم'], ['list', 'المتابعة'], ['mem', 'الأعضاء'], ['send', 'الإرسال'], ['more', 'المزيد']];
-    nav.style.display = '';
-    nav.replaceChildren.apply(nav, tabs.map(function (t) { return h('button', { class: ui.tab === t[0] ? 'on' : '', onclick: function () { ui.tab = t[0]; render(); } }, [svg(ICONS[t[0] === 'cal' ? 'cal' : t[0]]), h('span', { text: t[1] })]); }));
-    fab.style.display = (ui.tab === 'cal' || ui.tab === 'list') ? '' : 'none';
-    main.replaceChildren({ cal: vCal, list: vList, mem: vMem, send: vSend, more: vMore }[ui.tab]());
+    var tabs = [['cal', 'التقويم'], ['week', 'الأسبوع'], ['alerts', 'التنبيهات'], ['mem', 'الأعضاء'], ['send', 'الإرسال'], ['more', 'المزيد']], ac = alertCount();
+    nav.style.display = ''; nav.className = 'nav6';
+    nav.replaceChildren.apply(nav, tabs.map(function (t) {
+      return h('button', { class: ui.tab === t[0] ? 'on' : '', onclick: function () { ui.tab = t[0]; render(); } }, [svg(ICONS[t[0]]), h('span', { text: t[1] }), t[0] === 'alerts' && ac ? h('span', { class: 'badge', text: hd(ac) }) : null]);
+    }));
+    fab.style.display = (ui.tab === 'cal' || ui.tab === 'week') ? '' : 'none';
+    main.replaceChildren({ cal: vCal, week: vWeek, alerts: vAlerts, mem: vMem, send: vSend, more: vMore }[ui.tab]());
   }
 
   function evCard(ev) {
@@ -228,7 +257,7 @@ textarea{min-height:90px;resize:vertical}
     var who = n === S.members.length && n > 0 ? 'جميع الأعضاء' : ev.assignees.map(function (id) { return (mem(id) || { name: '—' }).name; }).join('، ');
     var wait = ev.assignees.filter(function (id) { var s = stOf(ev, id); return s.rep === 'done' && s.s !== 'done'; }).length;
     return h('div', { class: 'card ev ' + ev.type + (isDone(ev) ? ' fin' : ''), onclick: function () { detail(ev.id); } }, [
-      h('div', { class: 'row sp' }, [h('h3', { text: ev.title }), chip(ev.type === 'meeting' ? 'اجتماع' : 'مهمة', ev.type === 'meeting' ? 'm' : 't')]),
+      h('div', { class: 'row sp' }, [h('h3', { text: ev.title }), h('span', { class: 'row' }, flagChips(ev.imp, ev.urg).concat([chip(ev.type === 'meeting' ? 'اجتماع' : 'تكليف', ev.type === 'meeting' ? 'm' : 't')]))]),
       h('div', { class: 'meta', text: [ev.date ? dlong(ev.date) : 'بدون موعد', tfmt(ev.time), ev.place].filter(Boolean).join(' • ') }),
       h('div', { class: 'meta', text: who || 'لم يُحدَّد أعضاء' }),
       n ? h('div', { class: 'bar' }, [h('i', { style: 'width:' + Math.round(d / n * 100) + '%' })]) : null,
@@ -253,7 +282,7 @@ textarea{min-height:90px;resize:vertical}
         h('button', { text: '›', 'aria-label': 'الشهر التالي', onclick: function () { step(1); } })]),
       g, h('div', { class: 'row sp', style: 'margin:14px 2px 8px' }, [h('b', { text: dlong(ui.sel) }),
         h('button', { class: 'btn sm', text: 'اليوم', onclick: function () { var t = new Date(); ui.y = t.getFullYear(); ui.m = t.getMonth(); ui.sel = iso(t); render(); } })]),
-      es.length ? h('div', {}, es.map(evCard)) : h('div', { class: 'empty', text: 'لا توجد مهام أو اجتماعات في هذا اليوم' })]);
+      es.length ? h('div', {}, es.map(evCard)) : h('div', { class: 'empty', text: 'لا توجد تكليفات أو اجتماعات في هذا اليوم' })]);
   }
 
   function vList() {
@@ -269,24 +298,27 @@ textarea{min-height:90px;resize:vertical}
         (ui.filter === 'done' && isDone(e));
     }).sort(function (a, b) { return (a.date || '9999').localeCompare(b.date || '9999'); });
     var late = S.events.filter(function (e) { return e.type === 'task' && !isDone(e) && e.date && e.date < today; }).length;
-    return h('div', {}, [late ? h('div', { class: 'note', text: 'مهام تجاوزت موعدها ولم تنتهِ: ' + hd(late) }) : null,
+    return h('div', {}, [late ? h('div', { class: 'note', text: 'تكليفات تجاوزت موعدها ولم تنتهِ: ' + hd(late) }) : null,
       h('div', { class: 'chips' }, F.map(function (f) { return h('button', { class: ui.filter === f[0] ? 'on' : '', text: f[1], onclick: function () { ui.filter = f[0]; render(); } }); })),
-      es.length ? h('div', {}, es.map(evCard)) : h('div', { class: 'empty', text: 'لا يوجد شيء هنا. اضغط + لإضافة مهمة أو اجتماع.' })]);
+      es.length ? h('div', {}, es.map(evCard)) : h('div', { class: 'empty', text: 'لا يوجد شيء هنا. اضغط + لإضافة تكليف أو اجتماع.' })]);
   }
 
   function editEvent(ev, date) {
     var isNew = !ev, e = ev || { id: uid(), type: 'task', title: '', details: '', date: date || '', time: '', place: '', assignees: [], status: {}, created: Date.now() };
-    var type = e.type;
+    var type = e.type, imp = h('input', { type: 'checkbox', checked: !!e.imp }), urg = h('input', { type: 'checkbox', checked: !!e.urg });
     var title = h('input', { value: e.title, placeholder: 'مثال: إعداد تقرير التفتيش' }), det = h('textarea', { value: e.details, placeholder: 'تفاصيل التكليف (اختياري)' }),
       dt = h('input', { type: 'date', value: e.date }), tm = h('input', { type: 'time', value: e.time }), pl = h('input', { value: e.place, placeholder: 'مثال: قاعة الاجتماعات' });
     var placeBox = h('div', {}, [h('label', { text: 'المكان' }), pl]), dtLabel = h('label', { text: '' });
     var all = h('input', { type: 'checkbox', checked: S.members.length && e.assignees.length === S.members.length });
     var boxes = S.members.map(function (m) { return h('input', { type: 'checkbox', checked: e.assignees.indexOf(m.id) > -1, 'data-id': m.id }); });
-    var segB = [['task', 'مهمة / تكليف'], ['meeting', 'اجتماع']].map(function (t) { return h('button', { 'data-t': t[0], text: t[1], type: 'button', onclick: function () { type = t[0]; sync(); } }); });
+    var segB = [['task', 'تكليف'], ['meeting', 'اجتماع']].map(function (t) { return h('button', { 'data-t': t[0], text: t[1], type: 'button', onclick: function () { type = t[0]; sync(); } }); });
     function sync() { placeBox.style.display = type === 'meeting' ? '' : 'none'; dtLabel.textContent = type === 'meeting' ? 'تاريخ الاجتماع' : 'الموعد النهائي (اختياري)'; segB.forEach(function (b) { b.className = b.dataset.t === type ? 'on' : ''; }); }
     all.onchange = function () { boxes.forEach(function (b) { b.checked = all.checked; }); };
+    var groupRow = S.groups.length ? h('div', { class: 'row', style: 'margin:6px 0' }, [h('span', { class: 'meta', text: 'مجموعات:' })].concat(S.groups.map(function (g) {
+      return h('button', { type: 'button', class: 'btn sm', text: g.name + ' (' + hd(g.ids.length) + ')', onclick: function () { S.members.forEach(function (m, i) { if (g.ids.indexOf(m.id) > -1) boxes[i].checked = true; }); toast('أُضيف أعضاء «' + g.name + '»'); } }); }))) : null;
     var bg = sheet([h('h2', { text: isNew ? 'إضافة جديدة' : 'تعديل' }), h('div', { class: 'seg' }, segB),
-      h('label', { text: 'العنوان' }), title, h('label', { text: 'التفاصيل' }), det, dtLabel, dt, h('label', { text: 'الساعة (اختياري)' }), tm, placeBox, h('label', { text: 'الأعضاء المكلّفون' }),
+      h('div', { class: 'row', style: 'margin-top:10px;gap:18px' }, [h('label', { class: 'pick', style: 'margin:0;border:0;color:var(--ink);font-weight:700' }, [urg, 'عاجل']), h('label', { class: 'pick', style: 'margin:0;border:0;color:var(--ink);font-weight:700' }, [imp, 'هام'])]),
+      h('label', { text: 'العنوان' }), title, h('label', { text: 'التفاصيل' }), det, dtLabel, dt, h('label', { text: 'الساعة (اختياري)' }), tm, placeBox, h('label', { text: 'الأعضاء المكلّفون' }), groupRow,
       h('div', { class: 'card', style: 'padding:6px 12px' }, [h('label', { class: 'pick', style: 'margin:0;color:var(--ink);font-weight:700' }, [all, 'الكل'])].concat(S.members.map(function (m, i) {
         return h('label', { class: 'pick', style: 'margin:0;color:var(--ink)' }, [boxes[i], h('span', {}, [m.name, h('div', { class: 'meta', text: m.role })])]); }))),
       S.members.length ? null : h('div', { class: 'note', text: 'لا يوجد أعضاء بعد. أضفهم من «الأعضاء».' }),
@@ -294,7 +326,7 @@ textarea{min-height:90px;resize:vertical}
         h('button', { class: 'btn p', style: 'flex:1', text: 'حفظ', onclick: function () {
           if (!title.value.trim()) { toast('اكتب العنوان'); return; }
           if (type === 'meeting' && !dt.value) { toast('حدّد تاريخ الاجتماع'); return; }
-          e.type = type; e.title = title.value.trim(); e.details = det.value.trim(); e.date = dt.value; e.time = tm.value; e.place = type === 'meeting' ? pl.value.trim() : '';
+          e.type = type; e.imp = imp.checked; e.urg = urg.checked; e.title = title.value.trim(); e.details = det.value.trim(); e.date = dt.value; e.time = tm.value; e.place = type === 'meeting' ? pl.value.trim() : '';
           e.assignees = boxes.filter(function (b) { return b.checked; }).map(function (b) { return b.dataset.id; });
           e.assignees.forEach(function (id) { stOf(e, id); });
           if (isNew) S.events.push(e); save(); bg.close();
@@ -306,9 +338,9 @@ textarea{min-height:90px;resize:vertical}
 
   // ---- reports
   function reportHtml(ev, m, st) {
-    var rows = [['العضو', m.name], ['الصفة', m.role], ['النوع', ev.type === 'meeting' ? 'اجتماع' : 'تكليف'], ['العنوان', ev.title], ['التفاصيل', ev.details],
+    var rows = [['العضو', m.name], ['الصفة', m.role], ['النوع', ev.type === 'meeting' ? 'اجتماع' : 'تكليف'], ['الأولوية', [ev.urg ? 'عاجل' : '', ev.imp ? 'هام' : ''].filter(Boolean).join(' + ')], ['العنوان', ev.title], ['التفاصيل', ev.details],
       ['الموعد', [ev.date ? dlong(ev.date) : '', tfmt(ev.time)].filter(Boolean).join(' — ')], ['المكان', ev.place],
-      ['الحالة المعتمدة', ST[st.s]], ['ملاحظة الرئيس', st.hn], ['إفادة العضو', REP[st.rep]], ['ملاحظة العضو', st.note],
+      ['الحالة المعتمدة', ST[st.s]], ['الموعد الجديد (بعد التأجيل)', st.s === 'postponed' && st.nd ? dlong(st.nd) : ''], ['ملاحظة الرئيس', st.hn], ['إفادة العضو', REP[st.rep]], ['ملاحظة العضو', st.note],
       ['تاريخ الرد', st.rcv ? new Date(st.rcv).toLocaleString('ar-EG', { dateStyle: 'long', timeStyle: 'short' }) : ''],
       ['المرفقات', (st.files || []).map(function (f) { return f.name; }).join('، ')]];
     return '<div class="ph"><img src="' + LOGO + '" alt=""><div><div style="font-weight:700;color:#0B2B1F">النيابة العامة — الأمانة الفنية</div><h2>تقرير تكليف</h2></div></div><table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse;width:100%;border-color:#C99A3B">' +
@@ -327,9 +359,9 @@ textarea{min-height:90px;resize:vertical}
   // ---- send assignments to a member (file)
   function assignFile(m) {
     var items = S.events.filter(function (e) { return e.assignees.indexOf(m.id) > -1; }).map(function (e) {
-      var st = stOf(e, m.id); return { e: e.id, k: st.k, t: e.type, ti: e.title, d: e.details, dt: e.date, tm: e.time, pl: e.place, st: st.s, hn: st.hn || '' };
+      var st = stOf(e, m.id); return { e: e.id, k: st.k, t: e.type, ti: e.title, d: e.details, dt: e.date, tm: e.time, pl: e.place, st: st.s, hn: st.hn || '', im: e.imp ? 1 : 0, ur: e.urg ? 1 : 0, nd: st.s === 'postponed' ? (st.nd || '') : '' };
     });
-    return { atf: 'assign', v: 2, mid: m.id, name: m.name, role: m.role, h: S.settings.myWa || '', ts: Date.now(), items: items };
+    return { atf: 'assign', v: 2, mid: m.id, name: m.name, role: m.role, h: S.settings.myWa || '', ad: alertDays(), ts: Date.now(), items: items };
   }
   function sendAssign(m) {
     var d = assignFile(m); if (!d.items.length) { toast('لا توجد تكليفات لهذا العضو'); return; }
@@ -351,13 +383,13 @@ textarea{min-height:90px;resize:vertical}
       var btns = ['open', 'done', 'postponed', 'completion'].map(function (s) {
         return h('button', { class: 'btn sm' + (st.s === s ? ' p' : ''), text: ST[s], onclick: function () {
           if (s === 'completion') { var n = window.prompt('ما المطلوب استيفاؤه من ' + m.name + '؟', st.hn || ''); if (n === null) return; st.hn = n.trim(); }
-          else if (st.s === 'completion' && s !== 'completion') { /* keep note as history */ }
+          if (s === 'postponed') { postponeSheet(ev, [mid], again); return; }
           st.s = s; save(); again(); } });
       });
       return h('div', { class: 'as' }, [
         h('div', { class: 'row sp' }, [h('b', { text: m.name }), m.note ? chip('راجع الرقم', 'w') : null]),
         h('div', { class: 'meta', text: m.role + ' • ' + hd(m.phone) }),
-        h('div', { class: 'row', style: 'margin:6px 0' }, [stChip(st.s), st.rep ? chip('أفاد: ' + REP[st.rep], st.rep === 'done' ? 'ok' : '') : chip('لم يردّ بعد'),
+        h('div', { class: 'row', style: 'margin:6px 0' }, [stChip(st.s), st.s === 'postponed' && st.nd ? chip('إلى ' + dshort(st.nd), 'w') : null, st.rep ? chip('أفاد: ' + REP[st.rep], st.rep === 'done' ? 'ok' : '') : chip('لم يردّ بعد'),
           st.rep === 'done' && st.s !== 'done' ? chip('بانتظار اعتمادك', 'w') : null,
           st.rcv ? chip('ردّه ' + new Date(st.rcv).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' })) : null]),
         st.hn ? h('div', { class: 'meta', text: (st.s === 'completion' ? 'المطلوب استيفاؤه: ' : 'ملاحظتك: ') + st.hn }) : null,
@@ -371,20 +403,131 @@ textarea{min-height:90px;resize:vertical}
         })) : null,
         h('div', { class: 'row', style: 'margin-top:8px' }, [
           st.rcv ? h('button', { class: 'btn sm', text: 'عرض الرد / طباعة / Word', onclick: function () { reportSheet(ev, m, st); } }) : h('button', { class: 'btn sm', text: 'تقرير / طباعة', onclick: function () { reportSheet(ev, m, st); } }),
-          h('button', { class: 'btn sm', text: 'إرسال ملف التكليفات', onclick: function () { sendAssign(m); } })])]);
+          h('button', { class: 'btn sm', text: 'إرسال ملف التكليفات', onclick: function () { sendAssign(m); } }),
+          st.s !== 'done' ? h('a', { class: 'btn sm', text: 'تذكير واتساب', href: 'https://wa.me/' + waNum(m.phone) + '?text=' + encodeURIComponent(reminderText(ev, m, mid)), target: '_blank', rel: 'noopener' }) : null])]);
     });
     bg = sheet([
-      h('div', { class: 'row sp' }, [h('h2', { text: ev.title }), chip(ev.type === 'meeting' ? 'اجتماع' : 'مهمة', ev.type === 'meeting' ? 'm' : 't')]),
+      h('div', { class: 'row sp' }, [h('h2', { text: ev.title }), h('span', { class: 'row' }, flagChips(ev.imp, ev.urg).concat([chip(ev.type === 'meeting' ? 'اجتماع' : 'تكليف', ev.type === 'meeting' ? 'm' : 't')]))]),
       h('div', { class: 'meta', text: [ev.date ? dlong(ev.date) : '', tfmt(ev.time), ev.place].filter(Boolean).join(' • ') }),
       ev.details ? h('p', { text: ev.details, style: 'white-space:pre-wrap' }) : null,
       h('div', { class: 'note', style: 'margin-top:10px', text: 'الحالة المعتمدة (مفتوح / منتهي / مؤجل / استيفاء) بيدك أنت، وإفادة العضو تظهر بجانبها. تصل التغييرات إلى العضو مع «إرسال ملف التكليفات».' }),
       h('div', { class: 'card', style: 'padding:4px 14px' }, rows.length ? rows : [h('div', { class: 'empty', text: 'لم يُحدَّد أعضاء. اضغط تعديل.' })]),
       h('div', { class: 'row' }, [
         h('button', { class: 'btn sm', text: 'تعديل', onclick: function () { bg.close(); editEvent(ev); } }),
-        ev.date ? h('button', { class: 'btn sm', text: 'إضافة لتقويم الهاتف', onclick: function () { ics(ev); } }) : null,
+        ev.date ? h('button', { class: 'btn sm', text: 'إضافة لتقويم الهاتف', onclick: function () { ics(ev, alertDays()); } }) : null,
         h('button', { class: 'btn sm d', text: 'حذف', onclick: function () {
           if (confirm('حذف «' + ev.title + '»؟')) { ev.assignees.forEach(function (mid, i) { for (var k = 0; k < 20; k++) idbDel(ev.id + '|' + mid + '|' + k); }); S.events = S.events.filter(function (x) { return x.id !== id; }); save(); bg.close(); render(); } } }),
+        ev.assignees.length ? h('button', { class: 'btn sm', text: 'تأجيل غير المنتهين', onclick: function () { var open = ev.assignees.filter(function (i) { return stOf(ev, i).s !== 'done'; }); if (!open.length) return toast('كل الأعضاء أنهوه'); postponeSheet(ev, open, again); } }) : null,
         h('button', { class: 'btn sm', text: 'إغلاق', onclick: function () { bg.close(); } })])]);
+  }
+
+  function reminderText(ev, m, mid) {
+    var d = dueOf(ev, mid);
+    return 'السلام عليكم ورحمة الله وبركاته\nالسيد الأستاذ/ ' + m.name + '\nتذكير ' + (ev.type === 'meeting' ? 'بالاجتماع' : 'بالتكليف') + ': ' + ev.title + (d ? '\nالموعد: ' + dlong(d) + (ev.time ? ' ' + tfmt(ev.time) : '') : '') + '\nبرجاء الإفادة.\nرئيس الأمانة الفنية';
+  }
+  function postponeSheet(ev, mids, done) {
+    var today = iso(new Date()), base = ev.date && ev.date > today ? ev.date : today;
+    var dt = h('input', { type: 'date', value: addDays(base, 1) }), why = h('input', { placeholder: 'سبب التأجيل (اختياري)' });
+    var bg = sheet([h('h2', { text: 'تأجيل «' + ev.title + '»' }),
+      h('div', { class: 'meta', text: mids.length > 1 ? 'سيُطبَّق على ' + hd(mids.length) + ' أعضاء' : (mem(mids[0]) || { name: '' }).name }),
+      field('التاريخ الجديد', dt), field('السبب', why),
+      h('div', { class: 'row', style: 'margin-top:14px' }, [
+        h('button', { class: 'btn p', style: 'flex:1', text: 'تأكيد التأجيل', onclick: function () {
+          if (!dt.value) { toast('حدّد التاريخ الجديد'); return; }
+          mids.forEach(function (id) { var st = stOf(ev, id); st.s = 'postponed'; st.nd = dt.value; if (why.value.trim()) st.hn = why.value.trim(); });
+          save(); bg.close(); if (done) done(); else render(); toast('أُجِّل إلى ' + dlong(dt.value)); } }),
+        h('button', { class: 'btn', text: 'إلغاء', onclick: function () { bg.close(); } })])]);
+  }
+  function editGroup(g) {
+    var isNew = !g, x = g || { id: uid(), name: '', ids: [] };
+    var name = h('input', { value: x.name, placeholder: 'مثال: لجنة المراجعة' });
+    var boxes = S.members.map(function (m) { return h('input', { type: 'checkbox', checked: x.ids.indexOf(m.id) > -1, 'data-id': m.id }); });
+    var bg = sheet([h('h2', { text: isNew ? 'مجموعة جديدة' : x.name }), field('اسم المجموعة', name), h('label', { text: 'الأعضاء' }),
+      h('div', { class: 'card', style: 'padding:6px 12px' }, S.members.map(function (m, i) { return h('label', { class: 'pick', style: 'margin:0;color:var(--ink)' }, [boxes[i], h('span', {}, [m.name, h('div', { class: 'meta', text: m.role })])]); })),
+      h('div', { class: 'row', style: 'margin-top:14px' }, [
+        h('button', { class: 'btn p', style: 'flex:1', text: 'حفظ', onclick: function () {
+          var ids = boxes.filter(function (b) { return b.checked; }).map(function (b) { return b.dataset.id; });
+          if (!name.value.trim() || !ids.length) { toast('اكتب اسم المجموعة واختر عضوًا واحدًا على الأقل'); return; }
+          x.name = name.value.trim(); x.ids = ids; if (isNew) S.groups.push(x); save(); bg.close(); render(); } }),
+        isNew ? null : h('button', { class: 'btn d', text: 'حذف', onclick: function () { if (confirm('حذف مجموعة «' + x.name + '»؟ (لا يحذف الأعضاء)')) { S.groups = S.groups.filter(function (k) { return k.id !== x.id; }); save(); bg.close(); render(); } } }),
+        h('button', { class: 'btn', text: 'إغلاق', onclick: function () { bg.close(); } })])]);
+  }
+
+  // ---- alerts tab
+  function vAlerts() {
+    var t = iso(new Date()), n = alertDays(), groups = {};
+    alertItems().forEach(function (p) {
+      var d = dayDiff(p.due, t), cat = d < 0 ? 'late' : d === 0 ? 'today' : 'soon', k = cat + '|' + p.ev.id + '|' + p.due;
+      (groups[k] = groups[k] || { cat: cat, d: d, ev: p.ev, due: p.due, ms: [] }).ms.push(p.m);
+    });
+    var list = Object.keys(groups).map(function (k) { return groups[k]; });
+    var TITLES = { late: 'متأخرة', today: 'اليوم', soon: 'خلال ' + hd(n) + (n === 1 ? ' يوم' : ' أيام') };
+    var kids = [h('div', { class: 'note', text: 'تظهر هنا التكليفات والاجتماعات التي يحل موعدها خلال ' + hd(n) + (n === 1 ? ' يوم' : ' أيام') + '، والمتأخرة. تظهر التنبيهات عند فتح التطبيق، ولا يرسل التطبيق إشعارًا والهاتف مغلق. للتنبيه من الهاتف نفسه استخدم «إضافة لتقويم الهاتف» داخل التكليف (يضيف تذكيرًا قبل الموعد). تغيير عدد الأيام من «المزيد».' })];
+    ['late', 'today', 'soon'].forEach(function (cat) {
+      var g = list.filter(function (x) { return x.cat === cat; }).sort(function (a, b) { return a.due.localeCompare(b.due) || ((b.ev.urg ? 1 : 0) - (a.ev.urg ? 1 : 0)); });
+      if (!g.length) return;
+      kids.push(h('div', { class: 'row', style: 'margin:12px 2px 6px' }, [h('b', { text: TITLES[cat] }), chip(hd(g.length), cat === 'late' ? 'urg' : cat === 'today' ? 'imp' : '')]));
+      g.forEach(function (x) {
+        var names = x.ms.slice(0, 5).map(function (m) { return m.name; }).join('، ') + (x.ms.length > 5 ? ' و' + hd(x.ms.length - 5) + ' آخرين' : '');
+        kids.push(h('div', { class: 'card ev ' + x.ev.type, onclick: function () { detail(x.ev.id); } }, [
+          h('div', { class: 'row sp' }, [h('h3', { text: x.ev.title }), h('span', { class: 'row' }, flagChips(x.ev.imp, x.ev.urg).concat([chip(x.ev.type === 'meeting' ? 'اجتماع' : 'تكليف', x.ev.type === 'meeting' ? 'm' : 't')]))]),
+          h('div', { class: 'meta', text: [dlong(x.due), tfmt(x.ev.time), x.d < 0 ? 'تأخر ' + hd(-x.d) + (-x.d === 1 ? ' يوم' : ' أيام') : x.d === 0 ? 'اليوم' : x.d === 1 ? 'غدًا' : 'بعد ' + hd(x.d) + ' أيام'].filter(Boolean).join(' • ') }),
+          h('div', { class: 'meta', text: 'لم ينتهِ: ' + names })]));
+      });
+    });
+    if (kids.length === 1) kids.push(h('div', { class: 'empty', text: 'لا توجد تنبيهات الآن' }));
+    return h('div', {}, kids);
+  }
+
+  // ---- weekly summary
+  function weekRows() {
+    var ws = ui.wk, we = addDays(ws, 6);
+    return pairs().filter(function (p) {
+      if (ui.wscope === 'week') return p.due && p.due >= ws && p.due <= we;
+      if (ui.wscope === 'open') return p.st.s !== 'done';
+      return true;
+    }).sort(function (a, b) { return (a.due || '9999').localeCompare(b.due || '9999') || ((b.ev.urg ? 1 : 0) - (a.ev.urg ? 1 : 0)); });
+  }
+  function weekGroups(rows) {
+    if (ui.wmode === 'status') return ['open', 'completion', 'postponed', 'done'].map(function (s) { return { title: ST[s], key: s, rows: rows.filter(function (p) { return p.st.s === s; }) }; }).filter(function (g) { return g.rows.length; });
+    return S.members.map(function (m) { return { title: m.name + ' — ' + m.role, key: m.id, rows: rows.filter(function (p) { return p.m.id === m.id; }) }; }).filter(function (g) { return g.rows.length; });
+  }
+  function weekLabel() { return ui.wscope === 'week' ? dshort(ui.wk) + ' – ' + dshort(addDays(ui.wk, 6)) + ' ' + hd(parse(addDays(ui.wk, 6)).getFullYear()) : ui.wscope === 'open' ? 'كل التكليفات المفتوحة' : 'كل التكليفات'; }
+  function weekHtml(groups) {
+    var th = 'style="background:#0B2B1F;color:#C99A3B;text-align:right"';
+    return '<div class="ph"><img src="' + LOGO + '" alt=""><div><div style="font-weight:700;color:#0B2B1F">النيابة العامة — الأمانة الفنية</div><h2>ملخص الأسبوع — ' + esc(weekLabel()) + '</h2><div>' + (ui.wmode === 'status' ? 'مقسّم حسب الحالة' : 'مقسّم حسب العضو') + '</div></div></div>' +
+      groups.map(function (g) {
+        return '<h3 style="color:#0B2B1F;margin:16px 0 4px">' + esc(g.title) + ' (' + hd(g.rows.length) + ')</h3><table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%;border-color:#C99A3B"><tr><th ' + th + '>البند</th><th ' + th + '>' + (ui.wmode === 'status' ? 'العضو' : 'الحالة') + '</th><th ' + th + '>الموعد</th><th ' + th + '>ملاحظات</th></tr>' +
+          g.rows.map(function (p) {
+            var fl = [p.ev.urg ? 'عاجل' : '', p.ev.imp ? 'هام' : '', p.ev.type === 'meeting' ? 'اجتماع' : '', p.st.s === 'postponed' && p.ev.date ? 'مؤجل من ' + dshort(p.ev.date) : ''].filter(Boolean).join(' • ');
+            return '<tr><td>' + esc(p.ev.title) + '</td><td>' + esc(ui.wmode === 'status' ? p.m.name : ST[p.st.s]) + '</td><td>' + esc(p.due ? dlong(p.due) : 'بدون موعد') + '</td><td>' + esc(fl) + '</td></tr>';
+          }).join('') + '</table>';
+      }).join('');
+  }
+  function vWeek() {
+    var rows = weekRows(), groups = weekGroups(rows), counts = { open: 0, completion: 0, postponed: 0, done: 0 };
+    rows.forEach(function (p) { counts[p.st.s] = (counts[p.st.s] || 0) + 1; });
+    var scopes = [['week', 'أسبوع محدد'], ['open', 'كل المفتوح'], ['all', 'الكل']];
+    var kids = [h('div', { class: 'chips' }, scopes.map(function (x) { return h('button', { class: ui.wscope === x[0] ? 'on' : '', text: x[1], onclick: function () { ui.wscope = x[0]; render(); } }); }))];
+    if (ui.wscope === 'week') kids.push(h('div', { class: 'mh' }, [h('button', { text: '‹', 'aria-label': 'الأسبوع السابق', onclick: function () { ui.wk = addDays(ui.wk, -7); render(); } }),
+      h('b', {}, [h('span', { text: 'ملخص الأسبوع' }), h('span', { class: 'hj', text: weekLabel() })]),
+      h('button', { text: '›', 'aria-label': 'الأسبوع التالي', onclick: function () { ui.wk = addDays(ui.wk, 7); render(); } })]));
+    else kids.push(h('div', { class: 'mh' }, [h('b', { style: 'text-align:right' }, [h('span', { text: 'ملخص التكليفات' }), h('span', { class: 'hj', text: weekLabel() })])]));
+    if (ui.wscope === 'week') kids.push(h('div', { style: 'text-align:center;margin-bottom:8px' }, [h('button', { class: 'btn sm', text: 'هذا الأسبوع', onclick: function () { ui.wk = weekStart(iso(new Date())); render(); } })]));
+    kids.push(h('div', { class: 'row', style: 'margin:6px 0 10px' }, [chip('الكل ' + hd(rows.length)), chip('مفتوح ' + hd(counts.open || 0)), chip('استيفاء ' + hd(counts.completion || 0), 'bad'), chip('مؤجل ' + hd(counts.postponed || 0), 'w'), chip('منتهي ' + hd(counts.done || 0), 'ok')]));
+    kids.push(h('div', { class: 'seg', style: 'margin-bottom:10px' }, [['status', 'حسب الحالة'], ['member', 'حسب العضو']].map(function (x) { return h('button', { class: ui.wmode === x[0] ? 'on' : '', text: x[1], onclick: function () { ui.wmode = x[0]; render(); } }); })));
+    if (!groups.length) kids.push(h('div', { class: 'empty', text: ui.wscope === 'week' ? 'لا توجد تكليفات أو اجتماعات في هذا الأسبوع' : 'لا توجد تكليفات' }));
+    groups.forEach(function (g) {
+      kids.push(h('div', { class: 'card' }, [h('h2', { text: g.title + ' (' + hd(g.rows.length) + ')' })].concat(g.rows.map(function (p) {
+        return h('div', { class: 'item', onclick: function () { detail(p.ev.id); } }, [
+          h('div', { class: 'row sp' }, [h('b', { text: p.ev.title }), h('span', { class: 'row' }, flagChips(p.ev.imp, p.ev.urg).concat([ui.wmode === 'status' ? null : stChip(p.st.s)]))]),
+          h('div', { class: 'meta', text: [ui.wmode === 'status' ? p.m.name : null, p.due ? dlong(p.due) : 'بدون موعد', p.ev.type === 'meeting' ? 'اجتماع' : null, p.st.s === 'postponed' && p.ev.date ? '(مؤجل من ' + dshort(p.ev.date) + ')' : null].filter(Boolean).join(' • ') })]);
+      }))));
+    });
+    if (groups.length) kids.push(h('div', { class: 'row' }, [
+      h('button', { class: 'btn sm p', text: 'طباعة / حفظ PDF', onclick: function () { printReport(weekHtml(groups)); } }),
+      h('button', { class: 'btn sm', text: 'مشاركة كملف Word', onclick: function () { shareFile(wordFile(weekHtml(groups), 'ملخص الأسبوع'), 'ملخص الأسبوع'); } })]));
+    return h('div', {}, kids);
   }
 
   // ---- members tab
@@ -392,7 +535,10 @@ textarea{min-height:90px;resize:vertical}
     var warn = S.members.filter(function (m) { return m.note; }).length, kids = [];
     if (!S.members.length) kids.push(h('div', { class: 'note', text: 'لا يوجد أعضاء. استورد «بيانات_الأعضاء.json» من «المزيد»، أو أضفهم يدويًا.' }));
     if (warn) kids.push(h('div', { class: 'note', text: 'أرقام ' + hd(warn) + ' أعضاء تحتاج مراجعة. اضغط على العضو لتصحيح رقمه.' }));
-    kids.push(h('div', { class: 'row sp', style: 'margin-bottom:10px' }, [h('b', { text: 'الأعضاء (' + hd(S.members.length) + ')' }), h('button', { class: 'btn sm p', text: '+ عضو', onclick: function () { editMember(null); } })]));
+    kids.push(h('div', { class: 'row sp', style: 'margin-bottom:6px' }, [h('b', { text: 'المجموعات (' + hd(S.groups.length) + ')' }), h('button', { class: 'btn sm', text: '+ مجموعة', onclick: function () { if (!S.members.length) return toast('أضف أعضاء أولًا'); editGroup(null); } })]));
+    if (!S.groups.length) kids.push(h('div', { class: 'meta', style: 'margin-bottom:12px', text: 'اجمع عدة أعضاء في مجموعة، ثم اخترها بضغطة واحدة عند إضافة تكليف.' }));
+    S.groups.forEach(function (g) { kids.push(h('div', { class: 'card', onclick: function () { editGroup(g); } }, [h('div', { class: 'row sp' }, [h('b', { text: g.name }), chip(hd(g.ids.length) + ' أعضاء', 't')]), h('div', { class: 'meta', text: g.ids.map(function (id) { return (mem(id) || { name: '' }).name; }).filter(Boolean).join('، ') })])); });
+    kids.push(h('div', { class: 'row sp', style: 'margin:10px 0' }, [h('b', { text: 'الأعضاء ('  + hd(S.members.length) + ')' }), h('button', { class: 'btn sm p', text: '+ عضو', onclick: function () { editMember(null); } })]));
     S.members.forEach(function (m) {
       var open = S.events.filter(function (e) { return e.assignees.indexOf(m.id) > -1 && stOf(e, m.id).s !== 'done'; }).length;
       kids.push(h('div', { class: 'card', onclick: function () { editMember(m); } }, [
@@ -412,7 +558,7 @@ textarea{min-height:90px;resize:vertical}
           if (!name.value.trim() || !/^01[0125]\d{8}$/.test(p)) { toast('الاسم ورقم موبايل مصري من 11 رقمًا مطلوبان'); return; }
           x.name = name.value.trim(); x.role = role_.value.trim(); if (p !== x.phone) delete x.note; x.phone = p;
           if (isNew) S.members.push(x); save(); bg.close(); render(); } }),
-        isNew ? null : h('button', { class: 'btn d', text: 'حذف', onclick: function () { if (confirm('حذف ' + x.name + '؟')) { S.members = S.members.filter(function (k) { return k.id !== x.id; }); S.events.forEach(function (e) { e.assignees = e.assignees.filter(function (i) { return i !== x.id; }); }); save(); bg.close(); render(); } } }),
+        isNew ? null : h('button', { class: 'btn d', text: 'حذف', onclick: function () { if (confirm('حذف ' + x.name + '؟')) { S.members = S.members.filter(function (k) { return k.id !== x.id; }); S.events.forEach(function (e) { e.assignees = e.assignees.filter(function (i) { return i !== x.id; }); }); S.groups.forEach(function (g) { g.ids = g.ids.filter(function (i) { return i !== x.id; }); }); save(); bg.close(); render(); } } }),
         h('button', { class: 'btn', text: 'إغلاق', onclick: function () { bg.close(); } })])]);
   }
 
@@ -426,10 +572,10 @@ textarea{min-height:90px;resize:vertical}
         h('div', { class: 'row', style: 'margin:6px 0' }, [m.exp ? chip('آخر مشاركة للملف: ' + new Date(m.exp).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' }), 'w') : chip('لم يُشارَك الملف بعد'), replied ? chip('ردود مستلمة: ' + hd(replied), 'ok') : null]),
         h('div', { class: 'row' }, [
           h('button', { class: 'btn sm wa', disabled: items.length ? null : 'disabled', text: 'إرسال ملف التكليفات', onclick: function () { sendAssign(m); } }),
-          h('button', { class: 'btn sm', text: 'رسالة تنبيه', onclick: function () { notice(m); } })])]);
+          h('button', { class: 'btn sm', text: 'رسالة إشعار', onclick: function () { notice(m); } })])]);
     });
     return h('div', {}, [
-      h('div', { class: 'note', text: 'كل عضو يستلم ملفًا خاصًا به فيه تكليفاته فقط. اضغط «إرسال ملف التكليفات»، ثم اختر واتساب ومحادثة العضو واضغط إرسال. «رسالة تنبيه» اختيارية. التطبيق لا يعرف هل أُرسل الملف أو فُتح.' }),
+      h('div', { class: 'note', text: 'كل عضو يستلم ملفًا خاصًا به فيه تكليفاته فقط. اضغط «إرسال ملف التكليفات»، ثم اختر واتساب ومحادثة العضو واضغط إرسال. «رسالة إشعار» اختيارية. التطبيق لا يعرف هل أُرسل الملف أو فُتح.' }),
       cards.length ? h('div', {}, cards) : h('div', { class: 'empty', text: 'أضف أعضاء أولًا' })]);
   }
 
@@ -464,6 +610,7 @@ textarea{min-height:90px;resize:vertical}
   // ---- more tab
   function vMore() {
     var notice_ = h('textarea', { value: S.settings.notice, style: 'min-height:110px' });
+    var ad = h('input', { type: 'number', min: '1', max: '14', value: String(alertDays()), inputmode: 'numeric' });
     var au = h('input', { value: S.settings.appUrl || '', dir: 'ltr', placeholder: 'https://xxxx.netlify.app/' });
     var mw = h('input', { value: S.settings.myWa ? '0' + S.settings.myWa.slice(2) : '', dir: 'ltr', inputmode: 'tel', placeholder: '01xxxxxxxxx' });
     var rf = h('input', { type: 'file', accept: '.json,application/json', multiple: 'multiple', style: 'display:none', onchange: function () {
@@ -480,7 +627,7 @@ textarea{min-height:90px;resize:vertical}
           if (!norm.every(function (m) { return m.name && /^01[0125]\d{8}$/.test(m.phone || ''); })) throw 0;
           if (!Array.isArray(d) && d.events) {
             if (!confirm('سيُستبدل كل ما في التطبيق بمحتوى النسخة الاحتياطية. متابعة؟')) return;
-            S = { members: norm, events: d.events, settings: d.settings || S.settings };
+            S = { members: norm, events: d.events, settings: d.settings || S.settings, groups: d.groups || [] };
             (d.files || []).forEach(function (x) { idbPut(x.k, { name: x.name, type: x.type, buf: b64buf(x.data) }); });
           } else S.members = norm;
           save(); render(); toast('تم الاستيراد');
@@ -492,11 +639,11 @@ textarea{min-height:90px;resize:vertical}
         h('div', { class: 'meta', text: 'احفظ ملف رد العضو (رد_….json) من واتساب إلى «الملفات»، ثم اضغط الزر واختره. يمكنك اختيار عدة ملفات معًا. تُحفظ مرفقاتهم على هاتفك.' }),
         h('div', { style: 'margin-top:10px' }, [h('button', { class: 'btn p', text: 'استيراد ملفات الردود', onclick: function () { rf.click(); } }), rf])]),
       h('div', { class: 'card' }, [h('h2', { text: 'الإعدادات' }),
-        field('رقم واتساب الخاص بك (يصل للأعضاء داخل ملف التكليفات)', mw), field('رابط التطبيق للأعضاء (يُضاف لرسالة التنبيه)', au), field('نص رسالة التنبيه ({name} = اسم العضو)', notice_),
+        field('رقم واتساب الخاص بك (يصل للأعضاء داخل ملف التكليفات)', mw), field('رابط التطبيق للأعضاء (يُضاف لرسالة التنبيه)', au), field('عدد أيام التنبيه قبل موعد التكليف (صفحة التنبيهات)', ad), field('نص رسالة الإشعار ({name} = اسم العضو)', notice_),
         h('div', { style: 'margin-top:10px' }, [h('button', { class: 'btn p', text: 'حفظ', onclick: function () {
           var p = mw.value.replace(/[٠-٩]/g, function (c) { return '٠١٢٣٤٥٦٧٨٩'.indexOf(c); }).replace(/\D/g, '');
           if (p && !/^01[0125]\d{8}$/.test(p)) { toast('رقمك غير صحيح (11 رقمًا)'); return; }
-          S.settings.notice = notice_.value; S.settings.appUrl = au.value.trim(); S.settings.myWa = p ? waNum(p) : ''; save(); toast('تم الحفظ'); } })])]),
+          S.settings.alertDays = Math.max(1, Math.min(14, +ad.value || 2)); S.settings.notice = notice_.value; S.settings.appUrl = au.value.trim(); S.settings.myWa = p ? waNum(p) : ''; save(); toast('تم الحفظ'); } })])]),
       h('div', { class: 'card' }, [h('h2', { text: 'نسخة احتياطية والأعضاء' }),
         h('div', { class: 'meta', text: 'بياناتك على هذا الهاتف فقط. خذ نسخة دورية (تشمل المرفقات). نفس زر الاستيراد يقبل أيضًا «بيانات_الأعضاء.json».' }),
         h('div', { class: 'row', style: 'margin-top:10px' }, [
@@ -504,7 +651,7 @@ textarea{min-height:90px;resize:vertical}
             var nm = 'نسخة_نتيجة_الأمانة_' + iso(new Date()) + '.json';
             idbAll().then(function (all) { var o = JSON.parse(JSON.stringify(S)); o.files = all.filter(function (x) { return x.k.indexOf('m|') !== 0; }).map(function (x) { return { k: x.k, name: x.v.name, type: x.v.type, data: bufB64(x.v.buf) }; }); download(nm, JSON.stringify(o)); }, function () { download(nm, JSON.stringify(S)); }); } }),
           h('button', { class: 'btn', text: 'استيراد نسخة / أعضاء', onclick: function () { bf.click(); } }), bf])]),
-      h('div', { class: 'card' }, [h('div', { class: 'meta', style: 'white-space:pre-line', text: '• التطبيق لا يرسل ولا يستقبل من واتساب تلقائيًا؛ الإرسال والاستيراد بنقراتك.\n• لا توجد تنبيهات تلقائية؛ استخدم «إضافة لتقويم الهاتف».\n• البيانات لا تغادر هاتفك إلا بما تشاركه أنت.' }),
+      h('div', { class: 'card' }, [h('div', { class: 'meta', style: 'white-space:pre-line', text: '• التطبيق لا يرسل ولا يستقبل من واتساب تلقائيًا؛ الإرسال والاستيراد بنقراتك.\n• التنبيهات تظهر داخل التطبيق عند فتحه. للتنبيه من الهاتف نفسه استخدم «إضافة لتقويم الهاتف» (يتضمن تذكيرًا قبل الموعد).\n• البيانات لا تغادر هاتفك إلا بما تشاركه أنت.' }),
         h('div', { style: 'margin-top:8px' }, [h('button', { class: 'btn sm', text: 'تغيير الدور (رئيس/عضو)', onclick: switchRole })])])]);
   }
 
@@ -512,6 +659,7 @@ textarea{min-height:90px;resize:vertical}
     headLoad();
     fab.onclick = function () { editEvent(null, ui.tab === 'cal' ? ui.sel : ''); };
     render();
+    var ac = alertCount(); if (ac) toast('لديك ' + hd(ac) + ' تنبيه. افتح «التنبيهات»');
   }
 
   // ================================================================ MEMBER
@@ -528,7 +676,7 @@ textarea{min-height:90px;resize:vertical}
       if (!d || d.atf !== 'assign' || !Array.isArray(d.items) || !d.mid) return toast('هذا ليس ملف تكليفات');
       if (M && M.mid !== d.mid && !confirm('هذا الملف لعضو آخر (' + d.name + ') بينما التطبيق مضبوط على ' + M.name + '. استبدال؟')) return;
       var old = M && M.mid === d.mid ? M : { rep: {} };
-      M = { mid: d.mid, name: d.name, role: d.role, h: d.h, items: d.items, rep: old.rep || {}, imported: Date.now() };
+      M = { mid: d.mid, name: d.name, role: d.role, h: d.h, ad: d.ad || 2, items: d.items, rep: old.rep || {}, imported: Date.now() };
       msave(); mui.prepared = null; mdraw(); toast('تم استيراد ' + hd(d.items.length) + ' تكليف');
     });
   }
@@ -561,7 +709,8 @@ textarea{min-height:90px;resize:vertical}
         h('div', { style: 'text-align:center' }, [h('button', { class: 'btn sm', text: 'تغيير الدور', onclick: switchRole })]));
       return;
     }
-    var items = M.items.slice().sort(function (a, b) { return (a.dt || '9999').localeCompare(b.dt || '9999'); });
+    var items = M.items.slice().sort(function (a, b) { return (mdue(a) || '9999').localeCompare(mdue(b) || '9999') || ((b.ur || 0) - (a.ur || 0)); });
+    var today = iso(new Date()), soon = items.filter(function (it) { var d = mdue(it); if (it.st === 'done' || !d) return false; var k = dayDiff(d, today); return k <= (M.ad || 2) && !(it.t === 'meeting' && k < 0); });
     var needs = items.filter(function (it) { return it.st === 'completion'; }).length;
     var prep = mui.prepared;
     main.replaceChildren(h('div', {}, [
@@ -570,6 +719,7 @@ textarea{min-height:90px;resize:vertical}
         prep ? h('div', { class: 'note', style: 'margin-top:10px' }, [h('div', { text: 'الملف جاهز: ' + prep.name + ' (' + hd(Math.max(1, Math.round(prep.size / 1024))) + ' ك.ب)' }),
           h('div', { style: 'margin-top:8px' }, [h('button', { class: 'btn wa', style: 'width:100%', text: 'إرسال الرد عبر واتساب', onclick: function () { shareFile(prep, 'رد ' + M.name + ' على التكليفات'); } })]),
           h('div', { class: 'meta', style: 'margin-top:6px', text: 'اختر واتساب ثم محادثة رئيس الأمانة واضغط إرسال. إن لم تظهر القائمة يُنزَّل الملف فأرسله كمرفق.' })]) : null]),
+      soon.length ? h('div', { class: 'note' }, [h('b', { text: 'تنبيه: ' + hd(soon.length) + ' موعد قريب أو متأخر' })].concat(soon.map(function (it) { var k = dayDiff(mdue(it), today); return h('div', { class: 'meta', text: '• ' + it.ti + ' — ' + (k < 0 ? 'متأخر ' + hd(-k) + ' يوم' : k === 0 ? 'اليوم' : k === 1 ? 'غدًا' : 'بعد ' + hd(k) + ' أيام') }); }))) : null,
       needs ? h('div', { class: 'note', text: 'مطلوب منك استيفاء في ' + hd(needs) + ' تكليف. راجع ملاحظات الرئيس أدناه.' }) : null,
       items.length ? h('div', {}, items.map(mCard)) : h('div', { class: 'empty', text: 'لا توجد تكليفات' }),
       h('div', { style: 'text-align:center' }, [h('button', { class: 'btn sm', text: 'تغيير الدور', onclick: switchRole })])]));
@@ -578,16 +728,17 @@ textarea{min-height:90px;resize:vertical}
     var f = h('input', { type: 'file', accept: '.json,application/json', style: 'display:none', onchange: function () { if (f.files[0]) importAssign(f.files[0]); } });
     return h('span', {}, [h('button', { class: 'btn' + (big ? ' p' : ' sm'), text: 'استيراد ملف التكليفات', onclick: function () { f.click(); } }), f]);
   }
+  function mdue(it) { return it.st === 'postponed' && it.nd ? it.nd : it.dt; }
   function mCard(it) {
     var r = rep(it.e), meet = it.t === 'meeting';
     var note = h('textarea', { value: r.note, placeholder: 'ملاحظة للرئيس (اختيارية)', onchange: function () { r.note = note.value; r.ts = Date.now(); msave(); } });
     var fi = h('input', { type: 'file', multiple: 'multiple', style: 'display:none', onchange: function () { addFiles(it.e, fi.files); } });
     var opts = meet ? [['done', 'سأحضر'], ['declined', 'أعتذر']] : [['doing', 'قيد التنفيذ'], ['done', 'تم التنفيذ'], ['declined', 'اعتذار']];
     return h('div', { class: 'card ev ' + (meet ? 'meeting' : '') }, [
-      h('div', { class: 'row sp' }, [h('h3', { text: it.ti }), chip(meet ? 'اجتماع' : 'تكليف', meet ? 'm' : 't')]),
+      h('div', { class: 'row sp' }, [h('h3', { text: it.ti }), h('span', { class: 'row' }, flagChips(it.im, it.ur).concat([chip(meet ? 'اجتماع' : 'تكليف', meet ? 'm' : 't')]))]),
       h('div', { class: 'meta', text: [it.dt ? dlong(it.dt) : '', tfmt(it.tm), it.pl].filter(Boolean).join(' • ') }),
       it.d ? h('p', { text: it.d, style: 'white-space:pre-wrap;margin:6px 0' }) : null,
-      h('div', { class: 'row', style: 'margin:6px 0' }, [h('span', { class: 'meta', text: 'حالة الرئيس:' }), stChip(it.st || 'open')]),
+      h('div', { class: 'row', style: 'margin:6px 0' }, [h('span', { class: 'meta', text: 'حالة الرئيس:' }), stChip(it.st || 'open'), it.st === 'postponed' && it.nd ? chip('إلى ' + dshort(it.nd), 'w') : null]),
       it.hn ? h('div', { class: it.st === 'completion' ? 'note' : 'meta', text: (it.st === 'completion' ? 'المطلوب استيفاؤه: ' : 'ملاحظة الرئيس: ') + it.hn }) : null,
       h('label', { text: 'إفادتك' }),
       h('div', { class: 'seg' }, opts.map(function (o) { return h('button', { class: r.r === o[0] ? 'on' : '', text: o[1], onclick: function () { r.r = o[0]; r.note = note.value; r.ts = Date.now(); msave(); mdraw(); } }); })),
@@ -596,7 +747,7 @@ textarea{min-height:90px;resize:vertical}
       h('div', { class: 'row', style: 'margin-top:8px' }, [
         h('button', { class: 'btn sm', text: 'إرفاق ملف', onclick: function () { fi.click(); } }), fi,
         (r.files || []).length ? h('button', { class: 'btn sm d', text: 'حذف المرفقات', onclick: function () { clearFiles(it.e); } }) : null,
-        it.dt ? h('button', { class: 'btn sm', text: 'إضافة لتقويم هاتفي', onclick: function () { ics({ id: it.e, type: it.t, title: it.ti, details: it.d, date: it.dt, time: it.tm, place: it.pl }); } }) : null])]);
+        mdue(it) ? h('button', { class: 'btn sm', text: 'إضافة لتقويم هاتفي', onclick: function () { ics({ id: it.e, type: it.t, title: it.ti, details: it.d, date: mdue(it), time: it.tm, place: it.pl }, M.ad || 2); } }) : null])]);
   }
 
   // ================================================================ START
