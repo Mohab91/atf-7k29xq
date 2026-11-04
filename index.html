@@ -130,7 +130,8 @@ input[type=search]{-webkit-appearance:none;appearance:none}
   function iso(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
   function parse(s) { var p = s.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
   function dlong(s) { return parse(s).toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); }
-  function hijri(d) { try { return d.toLocaleDateString('ar-SA-u-ca-islamic-umalqura', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) { return ''; } }
+  var HADJ = Math.max(-3, Math.min(3, parseInt(localStorage.getItem('atf_hadj'), 10) || 0));
+  function hijri(d) { try { d = new Date(d.getTime() + HADJ * 864e5); return d.toLocaleDateString('ar-SA-u-ca-islamic-umalqura', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) { return ''; } }
   function tfmt(t) { if (!t) return ''; var p = t.split(':'), hh = +p[0]; return hd(((hh % 12) || 12) + ':' + p[1]) + (hh < 12 ? ' ص' : ' م'); }
   function hd(t) { return String(t).replace(/\d/g, function (c) { return '٠١٢٣٤٥٦٧٨٩'[c]; }); }
   function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
@@ -211,7 +212,8 @@ input[type=search]{-webkit-appearance:none;appearance:none}
   }
   function download(name, text) { saveBlob(new Blob([text], { type: 'application/json' }), name); }
 
-  document.getElementById('today').textContent = new Date().toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' }) + ' • ' + hijri(new Date());
+  function setToday() { document.getElementById('today').textContent = new Date().toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' }) + ' • ' + hijri(new Date()); }
+  setToday();
   var main = document.getElementById('main'), nav = document.getElementById('nav'), fab = document.getElementById('fab');
 
   // installable web app: manifest + icons are real files next to index.html; the service worker lets it open offline
@@ -409,7 +411,7 @@ input[type=search]{-webkit-appearance:none;appearance:none}
         var st = stOf(e, m.id);
         return { e: e.id, k: st.k, t: e.type, ti: e.title, d: e.details, dt: e.date, tm: e.time, pl: e.place, st: st.s, hn: st.hn || '', im: e.imp ? 1 : 0, ur: e.urg ? 1 : 0, nd: st.s === 'postponed' ? (st.nd || '') : '', files: files };
       });
-    }).then(function (items) { return { obj: { atf: 'assign', v: 3, mid: m.id, name: m.name, role: m.role, h: S.settings.myWa || '', ad: alertDays(), ts: Date.now(), items: items }, name: 'تكليفات_' + m.name + '.json', n: items.length }; });
+    }).then(function (items) { return { obj: { atf: 'assign', v: 3, mid: m.id, name: m.name, role: m.role, h: '', ad: alertDays(), ha: HADJ, ts: Date.now(), items: items }, name: 'تكليفات_' + m.name + '.json', n: items.length }; });
   }
   function buildAll() {
     var evs = S.events.filter(function (e) { return e.assignees.length; }), used = {};
@@ -420,7 +422,7 @@ input[type=search]{-webkit-appearance:none;appearance:none}
         return { e: e.id, t: e.type, ti: e.title, d: e.details, dt: e.date, tm: e.time, pl: e.place, im: e.imp ? 1 : 0, ur: e.urg ? 1 : 0, files: files,
           who: e.assignees.filter(function (id) { return mem(id); }).map(function (id) { var st = stOf(e, id); return { m: id, k: st.k, st: st.s, hn: st.hn || '', nd: st.s === 'postponed' ? (st.nd || '') : '' }; }) };
       });
-    }).then(function (items) { return { obj: { atf: 'assign-all', v: 3, h: S.settings.myWa || '', ad: alertDays(), ts: Date.now(), members: members, items: items }, name: 'تكليفات_الأمانة_' + iso(new Date()) + '.json', n: items.length, mids: Object.keys(used) }; });
+    }).then(function (items) { return { obj: { atf: 'assign-all', v: 3, h: '', ad: alertDays(), ha: HADJ, ts: Date.now(), members: members, items: items }, name: 'تكليفات_الأمانة_' + iso(new Date()) + '.json', n: items.length, mids: Object.keys(used) }; });
   }
   // build the file first, then ask for a fresh tap to share it (phones only allow sharing right after a tap)
   function prepSheet(title, build, onSent) {
@@ -444,7 +446,7 @@ input[type=search]{-webkit-appearance:none;appearance:none}
     prepSheet('ملف واحد لكل الأعضاء', buildAll, function (res) { var t = Date.now(); S.members.forEach(function (m) { if (res.mids.indexOf(m.id) > -1) m.exp = t; }); save(); render(); });
   }
   function notice(m) {
-    var t = S.settings.notice.replace(/نتيجة الأمانة الفنية/g, 'أعمال النيابة الفنية').replace(/\{name\}/g, m.name) + (S.settings.appUrl ? '\n\nرابط التطبيق: ' + S.settings.appUrl : '');
+    var t = S.settings.notice.replace(/نتيجة الأمانة الفنية/g, 'أعمال النيابة الفنية').replace(/\{name\}/g, m.name);
     window.open('https://wa.me/' + waNum(m.phone) + '?text=' + encodeURIComponent(t), '_blank', 'noopener');
   }
 
@@ -763,8 +765,10 @@ input[type=search]{-webkit-appearance:none;appearance:none}
   function vMore() {
     var notice_ = h('textarea', { value: S.settings.notice, style: 'min-height:110px' });
     var ad = h('input', { type: 'number', min: '1', max: '14', value: String(alertDays()), inputmode: 'numeric' });
-    var au = h('input', { value: S.settings.appUrl || '', dir: 'ltr', placeholder: 'https://xxxx.netlify.app/' });
-    var mw = h('input', { value: S.settings.myWa ? '0' + S.settings.myWa.slice(2) : '', dir: 'ltr', inputmode: 'tel', placeholder: '01xxxxxxxxx' });
+    var hjLine = h('div', { style: 'font-weight:700;margin-top:8px' });
+    function drawH() { hjLine.textContent = 'اليوم هجريًا: ' + hijri(new Date()) + ' (التعديل: ' + (HADJ > 0 ? '+' : HADJ < 0 ? '−' : '') + hd(Math.abs(HADJ)) + ' يوم)'; }
+    function setH(v) { HADJ = Math.max(-3, Math.min(3, v)); lsSet('atf_hadj', String(HADJ)); setToday(); drawH(); }
+    drawH();
     var rf = h('input', { type: 'file', accept: '.json,application/json', multiple: 'multiple', style: 'display:none', onchange: function () {
       if (!rf.files.length) return;
       importReplyFiles(rf.files).then(function (c) { render(); toast('تم تحديث ' + hd(c.ok) + ' • قديم ' + hd(c.old) + ' • مرفوض ' + hd(c.bad)); });
@@ -790,12 +794,15 @@ input[type=search]{-webkit-appearance:none;appearance:none}
       h('div', { class: 'card' }, [h('h2', { text: 'استيراد ردود الأعضاء' }),
         h('div', { class: 'meta', text: 'احفظ ملف رد العضو (رد_….json) من واتساب إلى «الملفات»، ثم اضغط الزر واختره. يمكنك اختيار عدة ملفات معًا. تُحفظ مرفقاتهم على هاتفك.' }),
         h('div', { style: 'margin-top:10px' }, [h('button', { class: 'btn p', text: 'استيراد ملفات الردود', onclick: function () { rf.click(); } }), rf])]),
+      h('div', { class: 'card' }, [h('h2', { text: 'التاريخ الهجري' }),
+        h('div', { class: 'meta', text: 'قد يختلف يوم الهجري بيوم عن إعلان الأهلة. اضغط (+) أو (−) ليتطابق مع التقويم المعتمد عندك.' }),
+        hjLine, h('div', { class: 'row', style: 'margin-top:8px' }, [
+          h('button', { class: 'btn', text: '− يوم', onclick: function () { setH(HADJ - 1); } }), h('button', { class: 'btn', text: '+ يوم', onclick: function () { setH(HADJ + 1); } }),
+          h('button', { class: 'btn sm', text: 'إعادة الضبط', onclick: function () { setH(0); } })])]),
       h('div', { class: 'card' }, [h('h2', { text: 'الإعدادات' }),
-        field('رقم واتساب الخاص بك (يصل للأعضاء داخل ملف التكليفات)', mw), field('رابط التطبيق للأعضاء (يُضاف لرسالة التنبيه)', au), field('عدد أيام التنبيه قبل موعد التكليف (صفحة التنبيهات)', ad), field('نص رسالة الإشعار ({name} = اسم العضو)', notice_),
+        field('عدد أيام التنبيه قبل موعد التكليف (صفحة التنبيهات)', ad), field('نص رسالة الإشعار ({name} = اسم العضو)', notice_),
         h('div', { style: 'margin-top:10px' }, [h('button', { class: 'btn p', text: 'حفظ', onclick: function () {
-          var p = mw.value.replace(/[٠-٩]/g, function (c) { return '٠١٢٣٤٥٦٧٨٩'.indexOf(c); }).replace(/\D/g, '');
-          if (p && !/^01[0125]\d{8}$/.test(p)) { toast('رقمك غير صحيح (11 رقمًا)'); return; }
-          S.settings.alertDays = Math.max(1, Math.min(14, +ad.value || 2)); S.settings.notice = notice_.value; S.settings.appUrl = au.value.trim(); S.settings.myWa = p ? waNum(p) : ''; save(); toast('تم الحفظ'); } })])]),
+          S.settings.alertDays = Math.max(1, Math.min(14, +ad.value || 2)); S.settings.notice = notice_.value; save(); toast('تم الحفظ'); } })])]),
       h('div', { class: 'card' }, [h('h2', { text: 'نسخة احتياطية والأعضاء' }),
         h('div', { class: 'meta', text: 'بياناتك على هذا الهاتف فقط. خذ نسخة دورية (تشمل المرفقات). نفس زر الاستيراد يقبل أيضًا «بيانات_الأعضاء.json».' }),
         h('div', { class: 'row', style: 'margin-top:10px' }, [
@@ -824,6 +831,7 @@ input[type=search]{-webkit-appearance:none;appearance:none}
   }
   function rep(e) { M.rep = M.rep || {}; return (M.rep[e] = M.rep[e] || { r: '', note: '', ts: 0, files: [] }); }
   function applyAssign(info, raw) {
+    if (typeof info.ha === 'number') { HADJ = Math.max(-3, Math.min(3, info.ha)); lsSet('atf_hadj', String(HADJ)); setToday(); }
     (M ? M.items : []).forEach(function (it) { (it.af || []).forEach(function (f, i) { idbDel('m|a|' + it.e + '|' + i); }); });
     var oldRep = M && M.mid === info.mid ? (M.rep || {}) : {}, jobs = [];
     var items = raw.map(function (it) {
@@ -841,7 +849,7 @@ input[type=search]{-webkit-appearance:none;appearance:none}
       return { e: it.e, k: w.k, t: it.t, ti: it.ti, d: it.d, dt: it.dt, tm: it.tm, pl: it.pl, im: it.im, ur: it.ur, st: w.st, hn: w.hn, nd: w.nd, files: it.files };
     });
     if (M && M.mid !== m.id && !confirm('التطبيق مضبوط على ' + M.name + '. استبداله باسم ' + m.name + '؟')) return;
-    applyAssign({ mid: m.id, name: m.name, role: m.role, h: d.h, ad: d.ad }, raw);
+    applyAssign({ mid: m.id, name: m.name, role: m.role, h: d.h, ad: d.ad, ha: d.ha }, raw);
   }
   function importAssign(file) {
     readText(file).then(function (t) {
@@ -853,7 +861,7 @@ input[type=search]{-webkit-appearance:none;appearance:none}
       }
       if (!d || d.atf !== 'assign' || !Array.isArray(d.items) || !d.mid) return toast('هذا ليس ملف تكليفات');
       if (M && M.mid !== d.mid && !confirm('هذا الملف لعضو آخر (' + d.name + ') بينما التطبيق مضبوط على ' + M.name + '. استبدال؟')) return;
-      applyAssign({ mid: d.mid, name: d.name, role: d.role, h: d.h, ad: d.ad }, d.items);
+      applyAssign({ mid: d.mid, name: d.name, role: d.role, h: d.h, ad: d.ad, ha: d.ha }, d.items);
     });
   }
   function pickName() {
