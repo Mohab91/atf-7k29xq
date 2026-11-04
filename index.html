@@ -98,6 +98,9 @@ nav button{position:relative}
 .day.sel.urg{background:var(--red);color:#fff;border-color:var(--g9);outline:3px solid var(--g9)}
 .day.sel.imp{background:var(--blue);color:#fff;border-color:var(--g9);outline:3px solid var(--g9)}
 .legend{gap:6px;margin:8px 2px 0;font-size:12.5px}
+.nav7 button{font-size:10.5px}
+.nav7 button svg{width:21px;height:21px}
+input[type=search]{-webkit-appearance:none;appearance:none}
 </style>
 </head>
 <body>
@@ -131,6 +134,8 @@ nav button{position:relative}
   function tfmt(t) { if (!t) return ''; var p = t.split(':'), hh = +p[0]; return hd(((hh % 12) || 12) + ':' + p[1]) + (hh < 12 ? ' ص' : ' م'); }
   function hd(t) { return String(t).replace(/\d/g, function (c) { return '٠١٢٣٤٥٦٧٨٩'[c]; }); }
   function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+  function sizeTxt(n) { n = n || 0; return n < 1048576 ? hd(Math.max(1, Math.round(n / 1024))) + ' ك.ب' : hd(Math.round(n / 104857.6) / 10) + ' ميجا'; }
+  function nrm(t) { return String(t || '').replace(/[\u064b-\u0652\u0640]/g, '').replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/[٠-٩]/g, function (c) { return '٠١٢٣٤٥٦٧٨٩'.indexOf(c); }).toLowerCase(); }
   function waNum(p) { return '20' + p.replace(/^0/, ''); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function h(tag, p, kids) {
@@ -159,6 +164,7 @@ nav button{position:relative}
     send: icon('<path d="M21 3L10 14M21 3l-7 18-4-7-7-4z"/>'),
     week: icon('<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 13h2M12 13h2M16 13h2M8 17h2M12 17h2"/>'),
     alerts: icon('<path d="M6 8a6 6 0 0112 0c0 7 3 8 3 8H3s3-1 3-8M10 20a2 2 0 004 0"/>'),
+    arc: icon('<path d="M3 7h18v4H3zM5 11v9h14v-9M10 15h4"/>'),
     more: icon('<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>')
   };
 
@@ -256,13 +262,13 @@ nav button{position:relative}
   function alertCount() { var seen = {}; alertItems().forEach(function (p) { seen[p.ev.id] = 1; }); return Object.keys(seen).length; }
 
   function render() {
-    var tabs = [['cal', 'التقويم'], ['week', 'الأسبوع'], ['alerts', 'التنبيهات'], ['mem', 'الأعضاء'], ['send', 'الإرسال'], ['more', 'المزيد']], ac = alertCount();
-    nav.style.display = ''; nav.className = 'nav6';
+    var tabs = [['cal', 'التقويم'], ['week', 'الأسبوع'], ['alerts', 'التنبيهات'], ['mem', 'الأعضاء'], ['send', 'الإرسال'], ['arc', 'الأرشيف'], ['more', 'المزيد']], ac = alertCount();
+    nav.style.display = ''; nav.className = 'nav' + tabs.length;
     nav.replaceChildren.apply(nav, tabs.map(function (t) {
       return h('button', { class: ui.tab === t[0] ? 'on' : '', onclick: function () { ui.tab = t[0]; render(); } }, [svg(ICONS[t[0]]), h('span', { text: t[1] }), t[0] === 'alerts' && ac ? h('span', { class: 'badge', text: hd(ac) }) : null]);
     }));
     fab.style.display = (ui.tab === 'cal' || ui.tab === 'week') ? '' : 'none';
-    main.replaceChildren({ cal: vCal, week: vWeek, alerts: vAlerts, mem: vMem, send: vSend, more: vMore }[ui.tab]());
+    main.replaceChildren({ cal: vCal, week: vWeek, alerts: vAlerts, mem: vMem, send: vSend, arc: vArchive, more: vMore }[ui.tab]());
   }
 
   function evCard(ev) {
@@ -270,7 +276,7 @@ nav button{position:relative}
     var who = n === S.members.length && n > 0 ? 'جميع الأعضاء' : ev.assignees.map(function (id) { return (mem(id) || { name: '—' }).name; }).join('، ');
     var wait = ev.assignees.filter(function (id) { var s = stOf(ev, id); return s.rep === 'done' && s.s !== 'done'; }).length;
     return h('div', { class: 'card ev ' + ev.type + (isDone(ev) ? ' fin' : '') + (ev.urg ? ' urgent' : ev.imp ? ' important' : ''), onclick: function () { detail(ev.id); } }, [
-      h('div', { class: 'row sp' }, [h('h3', { text: ev.title }), h('span', { class: 'row' }, flagChips(ev.imp, ev.urg).concat([chip(ev.type === 'meeting' ? 'اجتماع' : 'تكليف', ev.type === 'meeting' ? 'm' : 't')]))]),
+      h('div', { class: 'row sp' }, [h('h3', { text: ev.title }), h('span', { class: 'row' }, flagChips(ev.imp, ev.urg).concat((ev.files || []).length ? [chip('📎 ' + hd(ev.files.length))] : []).concat([chip(ev.type === 'meeting' ? 'اجتماع' : 'تكليف', ev.type === 'meeting' ? 'm' : 't')]))]),
       h('div', { class: 'meta', text: [ev.date ? dlong(ev.date) : 'بدون موعد', tfmt(ev.time), ev.place].filter(Boolean).join(' • ') }),
       h('div', { class: 'meta', text: who || 'لم يُحدَّد أعضاء' }),
       n ? h('div', { class: 'bar' }, [h('i', { style: 'width:' + Math.round(d / n * 100) + '%' })]) : null,
@@ -320,6 +326,21 @@ nav button{position:relative}
   function editEvent(ev, date) {
     var isNew = !ev, e = ev || { id: uid(), type: 'task', title: '', details: '', date: date || '', time: '', place: '', assignees: [], status: {}, created: Date.now() };
     var type = e.type, imp = h('input', { type: 'checkbox', checked: !!e.imp }), urg = h('input', { type: 'checkbox', checked: !!e.urg });
+    var files = (e.files || []).map(function (f) { return { name: f.name, type: f.type, size: f.size, key: f.key }; }), removed = [], fileBox = h('div'), fileIn = h('input', { type: 'file', multiple: 'multiple', style: 'display:none' });
+    function drawFiles() {
+      fileBox.replaceChildren.apply(fileBox, files.map(function (f, i) {
+        return h('div', { class: 'row sp', style: 'padding:4px 0' }, [h('span', { class: 'meta', text: '📎 ' + f.name + ' (' + sizeTxt(f.size) + ')' }),
+          h('button', { type: 'button', class: 'btn sm d', text: '✕', onclick: function () { var x = files.splice(i, 1)[0]; if (!x.buf) removed.push(x); drawFiles(); } })]);
+      }));
+    }
+    fileIn.onchange = function () {
+      var list = [].slice.call(fileIn.files);
+      (function next() {
+        var f = list.shift(); if (!f) { fileIn.value = ''; drawFiles(); return; }
+        if (f.size > 10 * 1048576) { toast('«' + f.name + '» أكبر من 10 ميجا'); return next(); }
+        readBuf(f).then(function (buf) { files.push({ name: f.name, type: f.type || 'application/octet-stream', size: f.size, key: 'a|' + e.id + '|' + uid(), buf: buf }); next(); });
+      })();
+    };
     var title = h('input', { value: e.title, placeholder: 'مثال: إعداد تقرير التفتيش' }), det = h('textarea', { value: e.details, placeholder: 'تفاصيل التكليف (اختياري)' }),
       dt = h('input', { type: 'date', value: e.date }), tm = h('input', { type: 'time', value: e.time }), pl = h('input', { value: e.place, placeholder: 'مثال: قاعة الاجتماعات' });
     var placeBox = h('div', {}, [h('label', { text: 'المكان' }), pl]), dtLabel = h('label', { text: '' });
@@ -336,6 +357,8 @@ nav button{position:relative}
       h('div', { class: 'card', style: 'padding:6px 12px' }, [h('label', { class: 'pick', style: 'margin:0;color:var(--ink);font-weight:700' }, [all, 'الكل'])].concat(S.members.map(function (m, i) {
         return h('label', { class: 'pick', style: 'margin:0;color:var(--ink)' }, [boxes[i], h('span', {}, [m.name, h('div', { class: 'meta', text: m.role })])]); }))),
       S.members.length ? null : h('div', { class: 'note', text: 'لا يوجد أعضاء بعد. أضفهم من «الأعضاء».' }),
+      h('label', { text: 'مرفقات التكليف (يمكن اختيار أكثر من ملف)' }), fileBox,
+      h('div', { style: 'margin-top:6px' }, [h('button', { type: 'button', class: 'btn sm', text: '+ إضافة مرفقات', onclick: function () { fileIn.click(); } }), fileIn]),
       h('div', { class: 'row', style: 'margin-top:14px' }, [
         h('button', { class: 'btn p', style: 'flex:1', text: 'حفظ', onclick: function () {
           if (!title.value.trim()) { toast('اكتب العنوان'); return; }
@@ -343,11 +366,15 @@ nav button{position:relative}
           e.type = type; e.imp = imp.checked; e.urg = urg.checked; e.title = title.value.trim(); e.details = det.value.trim(); e.date = dt.value; e.time = tm.value; e.place = type === 'meeting' ? pl.value.trim() : '';
           e.assignees = boxes.filter(function (b) { return b.checked; }).map(function (b) { return b.dataset.id; });
           e.assignees.forEach(function (id) { stOf(e, id); });
-          if (isNew) S.events.push(e); save(); bg.close();
-          if (e.date) { ui.sel = e.date; var p = parse(e.date); ui.y = p.getFullYear(); ui.m = p.getMonth(); }
-          render(); toast('تم الحفظ. أرسل الملفات من تبويب «الإرسال»'); } }),
+          var jobs = removed.map(function (f) { return idbDel(f.key); }).concat(files.filter(function (f) { return f.buf; }).map(function (f) { return idbPut(f.key, { name: f.name, type: f.type, buf: f.buf }); }));
+          e.files = files.map(function (f) { return { name: f.name, type: f.type, size: f.size, key: f.key }; });
+          Promise.all(jobs).then(function () {
+            if (isNew) S.events.push(e); save(); bg.close();
+            if (e.date) { ui.sel = e.date; var p = parse(e.date); ui.y = p.getFullYear(); ui.m = p.getMonth(); }
+            render(); toast('تم الحفظ. أرسل الملفات من تبويب «الإرسال»');
+          }, function () { toast('تعذّر حفظ المرفقات على هذا الجهاز'); }); } }),
         h('button', { class: 'btn', text: 'إلغاء', onclick: function () { bg.close(); } })])]);
-    sync();
+    sync(); drawFiles();
   }
 
   // ---- reports
@@ -371,16 +398,50 @@ nav button{position:relative}
   }
 
   // ---- send assignments to a member (file)
-  function assignFile(m) {
-    var items = S.events.filter(function (e) { return e.assignees.indexOf(m.id) > -1; }).map(function (e) {
-      var st = stOf(e, m.id); return { e: e.id, k: st.k, t: e.type, ti: e.title, d: e.details, dt: e.date, tm: e.time, pl: e.place, st: st.s, hn: st.hn || '', im: e.imp ? 1 : 0, ur: e.urg ? 1 : 0, nd: st.s === 'postponed' ? (st.nd || '') : '' };
-    });
-    return { atf: 'assign', v: 2, mid: m.id, name: m.name, role: m.role, h: S.settings.myWa || '', ad: alertDays(), ts: Date.now(), items: items };
+  function evFiles(ev) {
+    return (ev.files || []).reduce(function (p, f) { return p.then(function (arr) { return idbGet(f.key).then(function (x) { if (x) arr.push({ name: x.name, type: x.type, data: bufB64(x.buf) }); return arr; }); }); }, Promise.resolve([]));
+  }
+  function seq(list, fn) { return list.reduce(function (p, x) { return p.then(function (out) { return fn(x).then(function (r) { out.push(r); return out; }); }); }, Promise.resolve([])); }
+  function buildAssign(m) {
+    var evs = S.events.filter(function (e) { return e.assignees.indexOf(m.id) > -1; });
+    return seq(evs, function (e) {
+      return evFiles(e).then(function (files) {
+        var st = stOf(e, m.id);
+        return { e: e.id, k: st.k, t: e.type, ti: e.title, d: e.details, dt: e.date, tm: e.time, pl: e.place, st: st.s, hn: st.hn || '', im: e.imp ? 1 : 0, ur: e.urg ? 1 : 0, nd: st.s === 'postponed' ? (st.nd || '') : '', files: files };
+      });
+    }).then(function (items) { return { obj: { atf: 'assign', v: 3, mid: m.id, name: m.name, role: m.role, h: S.settings.myWa || '', ad: alertDays(), ts: Date.now(), items: items }, name: 'تكليفات_' + m.name + '.json', n: items.length }; });
+  }
+  function buildAll() {
+    var evs = S.events.filter(function (e) { return e.assignees.length; }), used = {};
+    evs.forEach(function (e) { e.assignees.forEach(function (id) { used[id] = 1; }); });
+    var members = S.members.filter(function (m) { return used[m.id]; }).map(function (m) { return { id: m.id, name: m.name, role: m.role }; });
+    return seq(evs, function (e) {
+      return evFiles(e).then(function (files) {
+        return { e: e.id, t: e.type, ti: e.title, d: e.details, dt: e.date, tm: e.time, pl: e.place, im: e.imp ? 1 : 0, ur: e.urg ? 1 : 0, files: files,
+          who: e.assignees.filter(function (id) { return mem(id); }).map(function (id) { var st = stOf(e, id); return { m: id, k: st.k, st: st.s, hn: st.hn || '', nd: st.s === 'postponed' ? (st.nd || '') : '' }; }) };
+      });
+    }).then(function (items) { return { obj: { atf: 'assign-all', v: 3, h: S.settings.myWa || '', ad: alertDays(), ts: Date.now(), members: members, items: items }, name: 'تكليفات_الأمانة_' + iso(new Date()) + '.json', n: items.length, mids: Object.keys(used) }; });
+  }
+  // build the file first, then ask for a fresh tap to share it (phones only allow sharing right after a tap)
+  function prepSheet(title, build, onSent) {
+    toast('جارٍ تجهيز الملف…');
+    build().then(function (res) {
+      if (!res.n) { toast('لا توجد تكليفات لإرسالها'); return; }
+      var file = new File([JSON.stringify(res.obj)], res.name, { type: 'application/json' }), bg;
+      bg = sheet([h('h2', { text: title }),
+        h('div', { class: 'note', text: 'الملف جاهز: ' + res.name + ' (' + sizeTxt(file.size) + ') • ' + hd(res.n) + ' بند' }),
+        file.size > 25 * 1048576 ? h('div', { class: 'note', text: 'الملف كبير؛ قد يتأخر إرساله وفتحه على بعض الهواتف.' }) : null,
+        h('button', { class: 'btn wa', style: 'width:100%', text: 'إرسال عبر واتساب', onclick: function () { shareFile(file, title).then(function () { if (onSent) onSent(res); }); } }),
+        h('div', { class: 'meta', style: 'margin:8px 0', text: 'اختر واتساب ثم المحادثة واضغط إرسال. إن لم تظهر القائمة يُنزَّل الملف على هاتفك فأرسله كمرفق.' }),
+        h('button', { class: 'btn sm', text: 'إغلاق', onclick: function () { bg.close(); } })]);
+    }, function () { toast('تعذّر تجهيز الملف'); });
   }
   function sendAssign(m) {
-    var d = assignFile(m); if (!d.items.length) { toast('لا توجد تكليفات لهذا العضو'); return; }
-    m.exp = Date.now(); save();
-    shareFile(new File([JSON.stringify(d)], 'تكليفات_' + m.name + '.json', { type: 'application/json' }), 'ملف تكليفات ' + m.name).then(function () { render(); });
+    if (!S.events.some(function (e) { return e.assignees.indexOf(m.id) > -1; })) { toast('لا توجد تكليفات لهذا العضو'); return; }
+    prepSheet('ملف تكليفات ' + m.name, function () { return buildAssign(m); }, function () { m.exp = Date.now(); save(); render(); });
+  }
+  function sendAll() {
+    prepSheet('ملف واحد لكل الأعضاء', buildAll, function (res) { var t = Date.now(); S.members.forEach(function (m) { if (res.mids.indexOf(m.id) > -1) m.exp = t; }); save(); render(); });
   }
   function notice(m) {
     var t = S.settings.notice.replace(/نتيجة الأمانة الفنية/g, 'أعمال النيابة الفنية').replace(/\{name\}/g, m.name) + (S.settings.appUrl ? '\n\nرابط التطبيق: ' + S.settings.appUrl : '');
@@ -417,20 +478,22 @@ nav button{position:relative}
         })) : null,
         h('div', { class: 'row', style: 'margin-top:8px' }, [
           st.rcv ? h('button', { class: 'btn sm', text: 'عرض الرد / طباعة / Word', onclick: function () { reportSheet(ev, m, st); } }) : h('button', { class: 'btn sm', text: 'تقرير / طباعة', onclick: function () { reportSheet(ev, m, st); } }),
-          h('button', { class: 'btn sm', text: 'إرسال ملف التكليفات', onclick: function () { sendAssign(m); } }),
+          h('button', { class: 'btn sm', text: 'تجهيز ملف التكليفات', onclick: function () { sendAssign(m); } }),
           st.s !== 'done' ? h('a', { class: 'btn sm', text: 'تذكير واتساب', href: 'https://wa.me/' + waNum(m.phone) + '?text=' + encodeURIComponent(reminderText(ev, m, mid)), target: '_blank', rel: 'noopener' }) : null])]);
     });
     bg = sheet([
       h('div', { class: 'row sp' }, [h('h2', { text: ev.title }), h('span', { class: 'row' }, flagChips(ev.imp, ev.urg).concat([chip(ev.type === 'meeting' ? 'اجتماع' : 'تكليف', ev.type === 'meeting' ? 'm' : 't')]))]),
       h('div', { class: 'meta', text: [ev.date ? dlong(ev.date) : '', tfmt(ev.time), ev.place].filter(Boolean).join(' • ') }),
       ev.details ? h('p', { text: ev.details, style: 'white-space:pre-wrap' }) : null,
-      h('div', { class: 'note', style: 'margin-top:10px', text: 'الحالة المعتمدة (مفتوح / منتهي / مؤجل / استيفاء) بيدك أنت، وإفادة العضو تظهر بجانبها. تصل التغييرات إلى العضو مع «إرسال ملف التكليفات».' }),
+      (ev.files || []).length ? h('div', { class: 'card', style: 'padding:8px 14px' }, [h('b', { text: 'مرفقات التكليف (' + hd(ev.files.length) + ')' })].concat(ev.files.map(function (f) {
+        return h('div', { class: 'row sp', style: 'padding:4px 0' }, [h('span', { class: 'meta', text: '📎 ' + f.name + ' (' + sizeTxt(f.size) + ')' }), h('span', { class: 'row' }, [h('button', { class: 'btn sm', text: 'فتح', onclick: function () { openStored(f.key); } }), h('button', { class: 'btn sm', text: 'مشاركة', onclick: function () { shareStored(f.key); } })])]); }))) : null,
+      h('div', { class: 'note', style: 'margin-top:10px', text: 'الحالة المعتمدة (مفتوح / منتهي / مؤجل / استيفاء) بيدك أنت، وإفادة العضو تظهر بجانبها. تصل التغييرات إلى العضو مع «تجهيز ملف التكليفات».' }),
       h('div', { class: 'card', style: 'padding:4px 14px' }, rows.length ? rows : [h('div', { class: 'empty', text: 'لم يُحدَّد أعضاء. اضغط تعديل.' })]),
       h('div', { class: 'row' }, [
         h('button', { class: 'btn sm', text: 'تعديل', onclick: function () { bg.close(); editEvent(ev); } }),
         ev.date ? h('button', { class: 'btn sm', text: 'إضافة لتقويم الهاتف', onclick: function () { ics(ev, alertDays()); } }) : null,
         h('button', { class: 'btn sm d', text: 'حذف', onclick: function () {
-          if (confirm('حذف «' + ev.title + '»؟')) { ev.assignees.forEach(function (mid, i) { for (var k = 0; k < 20; k++) idbDel(ev.id + '|' + mid + '|' + k); }); S.events = S.events.filter(function (x) { return x.id !== id; }); save(); bg.close(); render(); } } }),
+          if (confirm('حذف «' + ev.title + '»؟')) { ev.assignees.forEach(function (mid, i) { for (var k = 0; k < 40; k++) idbDel(ev.id + '|' + mid + '|' + k); }); (ev.files || []).forEach(function (f) { idbDel(f.key); }); S.events = S.events.filter(function (x) { return x.id !== id; }); save(); bg.close(); render(); } } }),
         ev.assignees.length ? h('button', { class: 'btn sm', text: 'تأجيل غير المنتهين', onclick: function () { var open = ev.assignees.filter(function (i) { return stOf(ev, i).s !== 'done'; }); if (!open.length) return toast('كل الأعضاء أنهوه'); postponeSheet(ev, open, again); } }) : null,
         h('button', { class: 'btn sm', text: 'إغلاق', onclick: function () { bg.close(); } })])]);
   }
@@ -585,11 +648,15 @@ nav button{position:relative}
         h('div', { class: 'meta', text: m.role }),
         h('div', { class: 'row', style: 'margin:6px 0' }, [m.exp ? chip('آخر مشاركة للملف: ' + new Date(m.exp).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' }), 'w') : chip('لم يُشارَك الملف بعد'), replied ? chip('ردود مستلمة: ' + hd(replied), 'ok') : null]),
         h('div', { class: 'row' }, [
-          h('button', { class: 'btn sm wa', disabled: items.length ? null : 'disabled', text: 'إرسال ملف التكليفات', onclick: function () { sendAssign(m); } }),
+          h('button', { class: 'btn sm wa', disabled: items.length ? null : 'disabled', text: 'تجهيز ملف التكليفات', onclick: function () { sendAssign(m); } }),
           h('button', { class: 'btn sm', text: 'رسالة إشعار', onclick: function () { notice(m); } })])]);
     });
     return h('div', {}, [
-      h('div', { class: 'note', text: 'كل عضو يستلم ملفًا خاصًا به فيه تكليفاته فقط. اضغط «إرسال ملف التكليفات»، ثم اختر واتساب ومحادثة العضو واضغط إرسال. «رسالة إشعار» اختيارية. التطبيق لا يعرف هل أُرسل الملف أو فُتح.' }),
+      h('div', { class: 'card' }, [h('h2', { text: 'ملف واحد لكل الأعضاء' }),
+        h('div', { class: 'meta', text: 'ملف واحد فيه كل التكليفات وكل مرفقاتها. ترسله مرة واحدة (مثلًا لمجموعة واتساب)، ويستورده كل عضو ثم يختار اسمه فتظهر له تكليفاته.' }),
+        h('div', { class: 'note', style: 'margin-top:8px', text: 'تنبيه: اختيار الاسم ليس حماية. من يملك الملف يستطيع قراءة تكليفات الجميع ومرفقاتهم، وقد يرسل ردًّا باسم غيره. استعمله للتكليفات غير الحساسة، وللحساس أرسل لكل عضو ملفه الخاص من البطاقات أدناه.' }),
+        h('button', { class: 'btn wa', text: 'تجهيز ملف واحد للجميع', onclick: sendAll })]),
+      h('div', { class: 'note', text: 'أو أرسل لكل عضو ملفًا خاصًا به فيه تكليفاته فقط: اضغط «تجهيز ملف التكليفات» ثم «إرسال عبر واتساب». «رسالة إشعار» اختيارية. التطبيق لا يعرف هل أُرسل الملف أو فُتح.' }),
       cards.length ? h('div', {}, cards) : h('div', { class: 'empty', text: 'أضف أعضاء أولًا' })]);
   }
 
@@ -608,7 +675,7 @@ nav button{position:relative}
             (st.files || []).forEach(function (x, i) { idbDel(ev.id + '|' + d.mid + '|' + i); });
             st.rep = REP[it.r] ? it.r : ''; st.note = String(it.note || '').slice(0, 800); st.rts = it.ts; st.rcv = Date.now(); st.files = [];
             c.ok++; c.members[d.mid] = 1;
-            return (it.files || []).slice(0, 10).reduce(function (z, fl, i) {
+            return (it.files || []).slice(0, 30).reduce(function (z, fl, i) {
               return z.then(function () {
                 if (!fl || !fl.data || fl.data.length > 15000000) return;
                 st.files.push({ name: String(fl.name || 'مرفق').slice(0, 120), type: fl.type || 'application/octet-stream' });
@@ -619,6 +686,77 @@ nav button{position:relative}
         }, Promise.resolve());
       });
     }, Promise.resolve()).then(function () { save(); return c; });
+  }
+
+  // ---- archive + backup
+  function allFiles() {
+    var out = [];
+    S.events.forEach(function (ev) {
+      (ev.files || []).forEach(function (f) { out.push({ ev: ev, name: f.name, size: f.size, key: f.key, who: '', kind: 'مرفق التكليف' }); });
+      ev.assignees.forEach(function (mid) { var m = mem(mid), st = stOf(ev, mid); (st.files || []).forEach(function (f, i) { out.push({ ev: ev, name: f.name, size: f.size, key: ev.id + '|' + mid + '|' + i, who: m ? m.name : '', kind: 'مرفق ردّ' }); }); });
+    });
+    return out;
+  }
+  function buildBackup() {
+    return idbAll().catch(function () { return []; }).then(function (all) {
+      var o = JSON.parse(JSON.stringify(S)); o.atf = 'backup';
+      o.files = all.filter(function (x) { return String(x.k).indexOf('m|') !== 0; }).map(function (x) { return { k: x.k, name: x.v.name, type: x.v.type, data: bufB64(x.v.buf) }; });
+      return { obj: o, name: 'نسخة_أعمال_النيابة_' + iso(new Date()) + '.json', n: S.events.length + o.files.length + S.members.length };
+    });
+  }
+  function importBackup(f) {
+    readText(f).then(function (t) {
+      try {
+        var d = JSON.parse(t), ms = Array.isArray(d) ? d : d.members;
+        if (!Array.isArray(ms)) throw 0;
+        var norm = ms.map(function (m) { return { id: String(m.id || uid()), name: m.name, role: m.role, phone: m.phone, note: m.note }; });
+        if (!norm.every(function (m) { return m.name && /^01[0125]\d{8}$/.test(m.phone || ''); })) throw 0;
+        if (!Array.isArray(d) && d.events) {
+          if (!confirm('سيُستبدل كل ما في التطبيق بمحتوى النسخة الاحتياطية. متابعة؟')) return;
+          S = { members: norm, events: d.events, settings: d.settings || S.settings, groups: d.groups || [] };
+          Promise.all((d.files || []).map(function (x) { return idbPut(x.k, { name: x.name, type: x.type, buf: b64buf(x.data) }); })).then(function () { save(); render(); toast('تم استرجاع النسخة'); });
+        } else { S.members = norm; save(); render(); toast('تم استيراد الأعضاء'); }
+      } catch (e) { toast('الملف غير صالح'); }
+    });
+  }
+  function vArchive() {
+    var q = h('input', { type: 'search', value: ui.aq || '', placeholder: 'ابحث باسم تكليف أو اجتماع أو ملف أو عضو…' }), res = h('div'), chipsBox = h('div', { class: 'chips' });
+    var KINDS = [['all', 'الكل'], ['task', 'تكليفات'], ['meeting', 'اجتماعات'], ['file', 'ملفات']];
+    function drawChips() { chipsBox.replaceChildren.apply(chipsBox, KINDS.map(function (k) { return h('button', { class: ui.ak === k[0] ? 'on' : '', text: k[1], onclick: function () { ui.ak = k[0]; drawChips(); draw(); } }); })); }
+    function match(text) { var toks = nrm(q.value).split(/\s+/).filter(Boolean), t = nrm(text); return toks.every(function (k) { return t.indexOf(k) > -1; }); }
+    function draw() {
+      ui.aq = q.value; var kids = [], k = ui.ak || 'all';
+      if (k !== 'file') {
+        var evs = S.events.filter(function (e) { return (k === 'all' || e.type === k) && match([e.title, e.details, e.place, e.date, e.assignees.map(function (id) { return (mem(id) || { name: '' }).name; }).join(' ')].join(' ')); })
+          .sort(function (a, b) { return (b.date || '').localeCompare(a.date || ''); });
+        kids.push(h('div', { class: 'row', style: 'margin:8px 2px' }, [h('b', { text: 'التكليفات والاجتماعات (' + hd(evs.length) + ')' })]));
+        evs.slice(0, 40).forEach(function (e) { kids.push(evCard(e)); });
+        if (evs.length > 40) kids.push(h('div', { class: 'meta', text: 'يُعرض أول ٤٠ فقط. ضيّق البحث لتصل لغيرها.' }));
+        if (!evs.length) kids.push(h('div', { class: 'empty', text: 'لا نتائج' }));
+      }
+      if (k === 'all' || k === 'file') {
+        var fs = allFiles().filter(function (f) { return match([f.name, f.ev.title, f.who, f.kind].join(' ')); });
+        kids.push(h('div', { class: 'row', style: 'margin:12px 2px 8px' }, [h('b', { text: 'الملفات المخزنة (' + hd(fs.length) + ')' })]));
+        fs.slice(0, 60).forEach(function (f) {
+          kids.push(h('div', { class: 'card' }, [h('div', { class: 'row sp' }, [h('b', { text: '📎 ' + f.name }), chip(f.kind, f.who ? 't' : 'imp')]),
+            h('div', { class: 'meta', text: [f.ev.title, f.who, sizeTxt(f.size)].filter(Boolean).join(' • ') }),
+            h('div', { class: 'row', style: 'margin-top:6px' }, [h('button', { class: 'btn sm', text: 'فتح', onclick: function () { openStored(f.key); } }), h('button', { class: 'btn sm', text: 'مشاركة / حفظ', onclick: function () { shareStored(f.key); } }), h('button', { class: 'btn sm', text: 'التكليف', onclick: function () { detail(f.ev.id); } })])]));
+        });
+        if (!fs.length) kids.push(h('div', { class: 'empty', text: 'لا ملفات مطابقة' }));
+      }
+      res.replaceChildren.apply(res, kids);
+    }
+    q.addEventListener('input', draw); drawChips(); draw();
+    var stat = h('div', { class: 'meta', text: 'تكليفات واجتماعات: ' + hd(S.events.length) + ' • ملفات مخزنة: ' + hd(allFiles().length) });
+    try { if (navigator.storage && navigator.storage.estimate) navigator.storage.estimate().then(function (x) { if (x && x.usage) stat.textContent += ' • المساحة المستخدمة: ' + sizeTxt(x.usage); }); } catch (e) {}
+    var bf = h('input', { type: 'file', accept: '.json,application/json', style: 'display:none', onchange: function () { if (bf.files[0]) importBackup(bf.files[0]); } });
+    return h('div', {}, [
+      h('div', { class: 'card' }, [h('h2', { text: 'النسخة الاحتياطية' }), stat,
+        h('div', { class: 'meta', style: 'margin-top:6px', text: 'تشمل كل البيانات: الأعضاء والمجموعات والتكليفات والحالات والردود وكل الملفات المخزنة. لنقلها إلى جهاز آخر: أرسل الملف إلى الجهاز الجديد (واتساب أو AirDrop)، ثم على الجهاز الجديد اختر «رئيس الأمانة» ثم «الأرشيف» ثم «استيراد نسخة».' }),
+        h('div', { class: 'row', style: 'margin-top:10px' }, [
+          h('button', { class: 'btn p', text: 'أخذ نسخة احتياطية كاملة', onclick: function () { prepSheet('نسخة احتياطية كاملة', buildBackup); } }),
+          h('button', { class: 'btn', text: 'استيراد نسخة', onclick: function () { bf.click(); } }), bf])]),
+      h('div', { class: 'card' }, [h('h2', { text: 'البحث في الأرشيف' }), q, chipsBox]), res]);
   }
 
   // ---- more tab
@@ -673,6 +811,7 @@ nav button{position:relative}
     headLoad();
     fab.onclick = function () { editEvent(null, ui.tab === 'cal' ? ui.sel : ''); };
     render();
+    try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (x) {}
     var ac = alertCount(); if (ac) toast('لديك ' + hd(ac) + ' تنبيه. افتح «التنبيهات»');
   }
 
@@ -684,24 +823,61 @@ nav button{position:relative}
     M = lsGet(MKEY); nav.style.display = fab.style.display = 'none'; mdraw();
   }
   function rep(e) { M.rep = M.rep || {}; return (M.rep[e] = M.rep[e] || { r: '', note: '', ts: 0, files: [] }); }
+  function applyAssign(info, raw) {
+    (M ? M.items : []).forEach(function (it) { (it.af || []).forEach(function (f, i) { idbDel('m|a|' + it.e + '|' + i); }); });
+    var oldRep = M && M.mid === info.mid ? (M.rep || {}) : {}, jobs = [];
+    var items = raw.map(function (it) {
+      var af = (it.files || []).map(function (f, i) { jobs.push(idbPut('m|a|' + it.e + '|' + i, { name: f.name, type: f.type, buf: b64buf(f.data) })); return { name: f.name, type: f.type }; });
+      var o = {}; Object.keys(it).forEach(function (k) { if (k !== 'files') o[k] = it[k]; }); o.af = af; return o;
+    });
+    return Promise.all(jobs).then(function () {
+      M = { mid: info.mid, name: info.name, role: info.role, h: info.h, ad: info.ad || 2, items: items, rep: oldRep, imported: Date.now() };
+      msave(); mui.prepared = null; mui.pending = null; mui.change = false; mdraw(); toast('تم استيراد ' + hd(items.length) + ' تكليف');
+    }, function () { toast('تعذّر حفظ المرفقات على هذا الهاتف'); });
+  }
+  function chooseMember(d, m) {
+    var raw = d.items.filter(function (it) { return (it.who || []).some(function (w) { return w.m === m.id; }); }).map(function (it) {
+      var w = it.who.filter(function (x) { return x.m === m.id; })[0];
+      return { e: it.e, k: w.k, t: it.t, ti: it.ti, d: it.d, dt: it.dt, tm: it.tm, pl: it.pl, im: it.im, ur: it.ur, st: w.st, hn: w.hn, nd: w.nd, files: it.files };
+    });
+    if (M && M.mid !== m.id && !confirm('التطبيق مضبوط على ' + M.name + '. استبداله باسم ' + m.name + '؟')) return;
+    applyAssign({ mid: m.id, name: m.name, role: m.role, h: d.h, ad: d.ad }, raw);
+  }
   function importAssign(file) {
     readText(file).then(function (t) {
       var d; try { d = JSON.parse(t); } catch (e) { return toast('الملف غير صالح'); }
+      if (d && d.atf === 'assign-all' && Array.isArray(d.items) && Array.isArray(d.members)) {
+        var known = M && M.mid && !mui.change ? d.members.filter(function (m) { return m.id === M.mid; })[0] : null;
+        if (known) return chooseMember(d, known);
+        mui.pending = d; return mdraw();
+      }
       if (!d || d.atf !== 'assign' || !Array.isArray(d.items) || !d.mid) return toast('هذا ليس ملف تكليفات');
       if (M && M.mid !== d.mid && !confirm('هذا الملف لعضو آخر (' + d.name + ') بينما التطبيق مضبوط على ' + M.name + '. استبدال؟')) return;
-      var old = M && M.mid === d.mid ? M : { rep: {} };
-      M = { mid: d.mid, name: d.name, role: d.role, h: d.h, ad: d.ad || 2, items: d.items, rep: old.rep || {}, imported: Date.now() };
-      msave(); mui.prepared = null; mdraw(); toast('تم استيراد ' + hd(d.items.length) + ' تكليف');
+      applyAssign({ mid: d.mid, name: d.name, role: d.role, h: d.h, ad: d.ad }, d.items);
     });
   }
+  function pickName() {
+    var d = mui.pending;
+    main.replaceChildren(h('div', { class: 'card' }, [h('h2', { text: 'اختر اسمك' }), h('div', { class: 'meta', text: 'ستظهر لك تكليفاتك أنت داخل التطبيق.' })].concat(d.members.map(function (m) {
+      return h('button', { class: 'btn', style: 'width:100%;justify-content:flex-start;margin-top:8px;text-align:right', onclick: function () { chooseMember(d, m); } }, [h('span', {}, [m.name, h('div', { class: 'meta', text: m.role })])]);
+    })).concat([h('div', { style: 'margin-top:10px' }, [h('button', { class: 'btn sm', text: 'إلغاء', onclick: function () { mui.pending = null; mui.change = false; mdraw(); } })])])));
+  }
+  function changeBtn() {
+    var f = h('input', { type: 'file', accept: '.json,application/json', style: 'display:none', onchange: function () { if (f.files[0]) { mui.change = true; importAssign(f.files[0]); } } });
+    return h('span', {}, [h('button', { class: 'btn sm', text: 'تغيير الاسم', onclick: function () { f.click(); } }), f]);
+  }
   function addFiles(e, list) {
-    var r = rep(e), total = 0, files = [].slice.call(list);
-    function next() {
+    var r = rep(e), files = [].slice.call(list);
+    (function next() {
       var f = files.shift(); if (!f) { r.ts = Date.now(); msave(); mdraw(); return; }
-      if (f.size > 10 * 1024 * 1024) { toast('«' + f.name + '» أكبر من 10 ميجا'); return next(); }
-      readBuf(f).then(function (buf) { var i = r.files.length; r.files.push({ name: f.name, type: f.type || 'application/octet-stream' }); return idbPut('m|' + e + '|' + i, { name: f.name, type: f.type || 'application/octet-stream', buf: buf }); }).then(next);
-    }
-    next();
+      if (f.size > 10 * 1048576) { toast('«' + f.name + '» أكبر من 10 ميجا'); return next(); }
+      readBuf(f).then(function (buf) { var i = r.files.length; r.files.push({ name: f.name, type: f.type || 'application/octet-stream', size: f.size }); return idbPut('m|' + e + '|' + i, { name: f.name, type: f.type || 'application/octet-stream', buf: buf }); }).then(next);
+    })();
+  }
+  function removeFile(e, idx) {
+    var r = rep(e), n = r.files.length, chain = Promise.resolve();
+    for (var j = idx; j < n - 1; j++) (function (j) { chain = chain.then(function () { return idbGet('m|' + e + '|' + (j + 1)); }).then(function (x) { return x ? idbPut('m|' + e + '|' + j, x) : null; }); })(j);
+    chain.then(function () { return idbDel('m|' + e + '|' + (n - 1)); }).then(function () { r.files.splice(idx, 1); r.ts = Date.now(); msave(); mdraw(); });
   }
   function clearFiles(e) { var r = rep(e); r.files.forEach(function (x, i) { idbDel('m|' + e + '|' + i); }); r.files = []; r.ts = Date.now(); msave(); mdraw(); }
   function prepareReply() {
@@ -718,6 +894,7 @@ nav button{position:relative}
     });
   }
   function mdraw() {
+    if (mui.pending) return pickName();
     if (!M) {
       main.replaceChildren(h('div', { class: 'card' }, [h('h2', { text: 'مرحبًا بك' }), h('p', { text: 'استورد ملف التكليفات الذي أرسله لك رئيس الأمانة الفنية على واتساب (ملف باسم تكليفات_….json). احفظه أولًا في «الملفات» ثم اضغط الزر.' }), importBtn(true)]),
         h('div', { style: 'text-align:center' }, [h('button', { class: 'btn sm', text: 'تغيير الدور', onclick: switchRole })]));
@@ -729,7 +906,7 @@ nav button{position:relative}
     var prep = mui.prepared;
     main.replaceChildren(h('div', {}, [
       h('div', { class: 'card' }, [h('div', { class: 'meta', text: 'السيد الأستاذ/' }), h('h2', { text: M.name }), h('div', { class: 'meta', text: M.role }),
-        h('div', { class: 'row', style: 'margin-top:10px' }, [importBtn(false), h('button', { class: 'btn sm p', text: 'تجهيز ملف الرد للرئيس', onclick: prepareReply })]),
+        h('div', { class: 'row', style: 'margin-top:10px' }, [importBtn(false), changeBtn(), h('button', { class: 'btn sm p', text: 'تجهيز ملف الرد للرئيس', onclick: prepareReply })]),
         prep ? h('div', { class: 'note', style: 'margin-top:10px' }, [h('div', { text: 'الملف جاهز: ' + prep.name + ' (' + hd(Math.max(1, Math.round(prep.size / 1024))) + ' ك.ب)' }),
           h('div', { style: 'margin-top:8px' }, [h('button', { class: 'btn wa', style: 'width:100%', text: 'إرسال الرد عبر واتساب', onclick: function () { shareFile(prep, 'رد ' + M.name + ' على التكليفات'); } })]),
           h('div', { class: 'meta', style: 'margin-top:6px', text: 'اختر واتساب ثم محادثة رئيس الأمانة واضغط إرسال. إن لم تظهر القائمة يُنزَّل الملف فأرسله كمرفق.' })]) : null]),
@@ -752,14 +929,18 @@ nav button{position:relative}
       h('div', { class: 'row sp' }, [h('h3', { text: it.ti }), h('span', { class: 'row' }, flagChips(it.im, it.ur).concat([chip(meet ? 'اجتماع' : 'تكليف', meet ? 'm' : 't')]))]),
       h('div', { class: 'meta', text: [it.dt ? dlong(it.dt) : '', tfmt(it.tm), it.pl].filter(Boolean).join(' • ') }),
       it.d ? h('p', { text: it.d, style: 'white-space:pre-wrap;margin:6px 0' }) : null,
+      (it.af || []).length ? h('div', { class: 'card', style: 'padding:8px 12px;margin:6px 0' }, [h('b', { text: 'مرفقات التكليف (' + hd(it.af.length) + ')' })].concat(it.af.map(function (f, i) {
+        var key = 'm|a|' + it.e + '|' + i;
+        return h('div', { class: 'row sp', style: 'padding:4px 0' }, [h('span', { class: 'meta', text: '📎 ' + f.name }), h('span', { class: 'row' }, [h('button', { class: 'btn sm', text: 'فتح', onclick: function () { openStored(key); } }), h('button', { class: 'btn sm', text: 'حفظ', onclick: function () { shareStored(key); } })])]); }))) : null,
       h('div', { class: 'row', style: 'margin:6px 0' }, [h('span', { class: 'meta', text: 'حالة الرئيس:' }), stChip(it.st || 'open'), it.st === 'postponed' && it.nd ? chip('إلى ' + dshort(it.nd), 'w') : null]),
       it.hn ? h('div', { class: it.st === 'completion' ? 'note' : 'meta', text: (it.st === 'completion' ? 'المطلوب استيفاؤه: ' : 'ملاحظة الرئيس: ') + it.hn }) : null,
       h('label', { text: 'إفادتك' }),
       h('div', { class: 'seg' }, opts.map(function (o) { return h('button', { class: r.r === o[0] ? 'on' : '', text: o[1], onclick: function () { r.r = o[0]; r.note = note.value; r.ts = Date.now(); msave(); mdraw(); } }); })),
       note,
-      (r.files || []).length ? h('div', { style: 'margin-top:6px' }, r.files.map(function (f) { return h('div', { class: 'meta', text: '📎 ' + f.name }); })) : null,
+      (r.files || []).length ? h('div', { style: 'margin-top:6px' }, [h('div', { class: 'meta', text: 'مرفقات ردّك (' + hd(r.files.length) + ' • ' + sizeTxt(r.files.reduce(function (a, f) { return a + (f.size || 0); }, 0)) + ')' })].concat(r.files.map(function (f, i) {
+        return h('div', { class: 'row sp', style: 'padding:2px 0' }, [h('span', { class: 'meta', text: '📎 ' + f.name }), h('button', { class: 'btn sm d', text: '✕', onclick: function () { removeFile(it.e, i); } })]); }))) : null,
       h('div', { class: 'row', style: 'margin-top:8px' }, [
-        h('button', { class: 'btn sm', text: 'إرفاق ملف', onclick: function () { fi.click(); } }), fi,
+        h('button', { class: 'btn sm', text: 'إرفاق ملفات (أكثر من ملف)', onclick: function () { fi.click(); } }), fi,
         (r.files || []).length ? h('button', { class: 'btn sm d', text: 'حذف المرفقات', onclick: function () { clearFiles(it.e); } }) : null,
         mdue(it) ? h('button', { class: 'btn sm', text: 'إضافة لتقويم هاتفي', onclick: function () { ics({ id: it.e, type: it.t, title: it.ti, details: it.d, date: mdue(it), time: it.tm, place: it.pl }, M.ad || 2); } }) : null])]);
   }
